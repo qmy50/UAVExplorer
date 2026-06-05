@@ -4,7 +4,7 @@
 
 ## 一. 工作流程：
 
-on progress
+on progress 😚
 
 ### 项目测试于UBUNTU20.04 ROS1 noetic
 
@@ -37,4 +37,5 @@ roslaunch minco_curve explore.launch
 
 ## 三. Reference：
 [1]. 规划器整体结构及动态环境更新，a*搜索等模块参考/使用 ego planner 链接为：https://github.com/ZJU-FAST-Lab/ego-planner
-on progress
+
+on progress😎
