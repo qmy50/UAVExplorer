@@ -5,7 +5,8 @@
 #include <ros/ros.h>
 #include <ros/console.h>
 #include <Eigen/Dense>
-#include <plan_env/grid_map_new.h>
+// #include <plan_env/grid_map_new.h>
+#include <plan_env/grid_map_indoor.h>
 #include <queue>
 
 constexpr double inf = 1 << 20;
@@ -89,7 +90,7 @@ public:
 	AStar(const int& id){drone_id_ = id;};
 	~AStar();
 
-	inline int checkOccupancy(const Eigen::Vector3d &pos, const int& drone_id) { return grid_map_->getInflateOccupancy(pos,drone_id); }
+	inline int checkOccupancy(const Eigen::Vector3d &pos, const int& drone_id) { return grid_map_->getInflateOccupancy(pos); }
 
 	void initGridMap(GridMap::Ptr occ_map, const Eigen::Vector3i pool_size);
 

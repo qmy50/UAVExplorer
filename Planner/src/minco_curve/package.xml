@@ -21,7 +21,9 @@
   <depend>onboard_detector</depend>
   <depend>global_planner</depend>
   <depend>message_generation</depend>
-  
+  <depend>actionlib</depend>
+  <depend>actionlib_msgs</depend>
+  <depend>message_runtime</depend>
 
     <export>
     </export>

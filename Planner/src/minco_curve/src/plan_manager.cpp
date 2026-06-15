@@ -23,10 +23,10 @@ namespace fake_planner{
 
         nh.param("fsm/use_dwa",use_dwa_,false);
 
-        if(use_dwa_){
-            dwa_controller_.reset(new DWAController);
-            dwa_controller_->setupDWA(nh,grid_map_);
-        }
+        // if(use_dwa_){
+        //     dwa_controller_.reset(new DWAController);
+        //     dwa_controller_->setupDWA(nh,grid_map_);
+        // }
         my_traj_pub_ = nh.advertise<nav_msgs::Path>("my_traj", 10);;
         other_traj_pub_ = nh.advertise<nav_msgs::Path>("other_traj",10);
     }
@@ -234,15 +234,15 @@ namespace fake_planner{
         return global_path_points_.back();
     }
 
-    DWAController::Velocity FakePlanManager::getDWAcmd(const std::vector<double>& pose, 
-                                                        double v_c, double w_c,
-                                                        double dynamic_safe_radius) {
+    // DWAController::Velocity FakePlanManager::getDWAcmd(const std::vector<double>& pose, 
+    //                                                     double v_c, double w_c,
+    //                                                     double dynamic_safe_radius) {
 
-        Eigen::Vector3d current_pos(pose[0], pose[1],pose[3]);
-        double lookahead = dwa_controller_->lookahead_dist_ + v_c* 0.3;
-        Eigen::Vector3d target = getLookaheadTarget(current_pos, lookahead);
-        return dwa_controller_->calculateBestVelocity(pose, v_c, w_c, target, dynamic_safe_radius);
-    }
+    //     Eigen::Vector3d current_pos(pose[0], pose[1],pose[3]);
+    //     double lookahead = dwa_controller_->lookahead_dist_ + v_c* 0.3;
+    //     Eigen::Vector3d target = getLookaheadTarget(current_pos, lookahead);
+    //     return dwa_controller_->calculateBestVelocity(pose, v_c, w_c, target, dynamic_safe_radius);
+    // }
 
 
 

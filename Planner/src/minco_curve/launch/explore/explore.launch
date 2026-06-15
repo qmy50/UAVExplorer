@@ -50,8 +50,10 @@
 			<arg name="target0_y" value = "0"/>
 			<arg name="target0_z" value = "1.5"/>
 			<arg name="num_drone" value="$(arg num_drone)"/>
-			<rosparam file="$(find global_planner)/cfg/dep_param.yaml" ns="DEP"/>
+			<!-- <rosparam file="$(find global_planner)/cfg/dep_param.yaml" ns="DEP"/> -->
 			
 		</include>
+
+		<rosparam file="$(find global_planner)/cfg/dep_param.yaml" ns="DEP"/>
 
 </launch>

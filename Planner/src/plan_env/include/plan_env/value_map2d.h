@@ -15,7 +15,7 @@
 #include <Eigen/Eigen>
 #include <vector>
 #include <nav_msgs/OccupancyGrid.h>
-#include <plan_env/grid_map_new.h>
+#include <plan_env/grid_map_indoor.h>
 
 using Eigen::Vector2d;
 using Eigen::Vector2i;

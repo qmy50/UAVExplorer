@@ -1,0 +1,23 @@
+# RotateDrone.action — 无人机定点旋转 action
+#
+# 服务端: traj_server 在 cmdCallback 中执行旋转并控制位置保持
+# 客户端: FakeExploreFSM 发送旋转目标，等待 traj_server 通知完成
+
+# --- Goal: 客户端发送的旋转目标 ---
+float64 angle_rad       # 旋转角度 (rad, >0=CCW, <0=CW)
+float64 speed_rad_sec   # 旋转速度 (rad/s)
+float64 pos_x           # 悬停位置 X
+float64 pos_y           # 悬停位置 Y
+float64 pos_z           # 悬停位置 Z
+float64 angle_start     # 起始 yaw (rad)
+
+---
+# --- Result: 旋转完成后的结果 ---
+bool success            # 是否成功完成
+float64 final_yaw       # 最终 yaw (rad)
+string message          # 描述信息
+
+---
+# --- Feedback: 旋转过程中的实时反馈 ---
+float64 current_yaw     # 当前 yaw (rad)
+float64 progress        # 进度 [0.0 ~ 1.0]

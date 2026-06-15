@@ -136,7 +136,7 @@ include_directories(
 # )
 add_library(${PROJECT_NAME}
             include/${PROJECT_NAME}/PRMKDTree.cpp
-            include/${PROJECT_NAME}/dep.cpp
+            include/${PROJECT_NAME}/dep_indoor.cpp
             include/${PROJECT_NAME}/PRMAstar.cpp)
 
 
@@ -190,10 +190,17 @@ target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${OpenCV_LIBS})
 
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
-# catkin_install_python(PROGRAMS
-#   scripts/my_python_script
-#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+catkin_install_python(PROGRAMS
+  ../vlm/scripts/blip2_itm_node.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+# Install BLIP2 Flask server management scripts
+install(PROGRAMS
+  ../vlm/scripts/start_blip2_server.sh
+  ../vlm/scripts/stop_blip2_server.sh
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
 
 ## Mark executables for installation
 ## See http://docs.ros.org/melodic/api/catkin/html/howto/format1/building_executables.html

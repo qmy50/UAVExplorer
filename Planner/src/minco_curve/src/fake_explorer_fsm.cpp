@@ -1,5 +1,5 @@
 #include "fake_explorer_fsm.h"
-
+#include <tf/tf.h>
 
 namespace fake_planner
 {
@@ -98,7 +98,8 @@ void FakeExploreFSM::execDepCallback(const ros::TimerEvent &e){
         return;
     }
 
-    if (exec_state_ == RISING) { expPlanner_->updateRoadmapOnly(); return; }
+    if (exec_state_ == RISING) { //expPlanner_->updateRoadmapOnly(); 
+      return; }
 
     // if (have_odom_ && (now - last_dep_plan_time_).toSec() >= dep_plan_interval_) {
         // Skip replanning if we already have a path
@@ -138,7 +139,7 @@ void FakeExploreFSM::execDepCallback(const ros::TimerEvent &e){
             }
         } else {
             ROS_WARN_THROTTLE(1.0,"[ExploreFSM] DEP makePlan failed, rotating to explore");
-            srv_.request.angle_rad = M_PI/12;
+            srv_.request.angle_rad = M_PI/6;
             srv_.request.speed_rad_sec = 0.5f;
             srv_.request.pos_x = odom_pos_.x();
             srv_.request.pos_y = odom_pos_.y();

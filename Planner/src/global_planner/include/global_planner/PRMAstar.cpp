@@ -1,11 +1,40 @@
 #include "PRMAstar.h"
 #include <algorithm>
-#include <ros/ros.h> 
+#include <ros/ros.h>
 
 namespace PRM{
 	bool inClose(std::shared_ptr<Node> n, const std::unordered_set<std::shared_ptr<Node>>& close){
 		std::unordered_set<std::shared_ptr<Node>>::const_iterator got = close.find(n);
 		return not (got == close.end());
+	}
+
+	// 2D non-inflated line check: sample along segment at map resolution
+	static bool isLineOccupied2D(const std::shared_ptr<GridMap>& map,
+	                             const Eigen::Vector3d& p1, const Eigen::Vector3d& p2){
+		double res = map->getRes();
+		double dist = (Eigen::Vector2d(p2.x() - p1.x(), p2.y() - p1.y())).norm();
+		int steps = std::ceil(dist / res);
+		for (int i = 0; i <= steps; ++i) {
+			double t = (steps == 0) ? 0.0 : (double)i / steps;
+			double x = p1.x() + t * (p2.x() - p1.x());
+			double y = p1.y() + t * (p2.y() - p1.y());
+			if (map->is2DOccupied(x, y)) return true;
+		}
+		return false;
+	}
+
+	// 3D non-inflated line check: sample along segment at map resolution
+	static bool isLineOccupied3D(const std::shared_ptr<GridMap>& map,
+	                             const Eigen::Vector3d& p1, const Eigen::Vector3d& p2){
+		double res = map->getRes();
+		double dist = (p2 - p1).norm();
+		int steps = std::ceil(dist / res);
+		for (int i = 0; i <= steps; ++i) {
+			double t = (steps == 0) ? 0.0 : (double)i / steps;
+			Eigen::Vector3d pt = p1 + t * (p2 - p1);
+			if (map->isKnownOccupied(pt)) return true;
+		}
+		return false;
 	}
 
 	std::vector<std::shared_ptr<Node>> AStar(const std::shared_ptr<KDTree>& roadmap,
@@ -53,7 +82,10 @@ namespace PRM{
 			for (std::shared_ptr<Node> neighborNode : currNode->adjNodes){
 				// Node must be not in close
 				if (not inClose(neighborNode, close)){
-					if (map->is2DMapReady() ? !map->is2DInflatedOccupiedLine2D(currNode->pos, neighborNode->pos) : !map->isInflatedOccupiedLine(currNode->pos, neighborNode->pos)){
+					bool edge_free = map->is2DMapReady()
+					    ? !isLineOccupied2D(map, currNode->pos, neighborNode->pos)
+					    : !isLineOccupied3D(map, currNode->pos, neighborNode->pos);
+					if (edge_free){
 						double cost = currNode->g + (currNode->pos - neighborNode->pos).norm();
 						if (cost < neighborNode->g){
 							neighborNode->g = cost;

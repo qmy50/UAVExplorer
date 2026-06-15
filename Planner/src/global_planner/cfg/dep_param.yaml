@@ -1,6 +1,4 @@
-# odom_topic: "/drone_0_visual_slam/odom"
-# odom_topic: "/iris_0/my_odom"
-odom_topic: "/iris_0/mavros/odometry/in"
+odom_topic: "/drone_0_visual_slam/odom"
 local_region_min: [-5, -5, -2]
 local_region_max: [5, 5, 2]
 global_region_min: [-20, -20, 0]
@@ -25,9 +23,9 @@ max_connect_dist: 1.5
 num_yaw_angles: 32
 
 # Goal Candidate
-min_voxel_thresh: 0.5
-min_goal_candidates: 3
-max_goal_candidates: 5
+min_voxel_thresh: 0.3
+min_goal_candidates: 6
+max_goal_candidates: 10
 
 information_gain_update_distance: 1.0
 yaw_penalty_weight: 1.0

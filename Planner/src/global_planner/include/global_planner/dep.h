@@ -8,10 +8,11 @@
 #define DEP_H
 
 // #include <map_manager/dynamicMap.h>
-#include <plan_env/grid_map_new.h>
+#include <plan_env/grid_map_indoor.h>
 #include <plan_env/value_map2d.h>
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
+#include <std_msgs/Float64.h>
 #include <global_planner/PRMKDTree.h>
 #include <global_planner/PRMAstar.h>
 #include <global_planner/utils.h>
@@ -30,6 +31,7 @@ namespace globalPlanner{
 		ros::Publisher frontierVisPub_;
 		ros::Publisher valueMapPub_;      ///< Publisher for value map heatmap (OccupancyGrid)
 		ros::Subscriber odomSub_;
+		ros::Subscriber itmScoreSub_;     ///< Subscriber for BLIP2 ITM score from /blip2/itm_score
 		ros::Timer visTimer_;
 		ros::Timer valuemapTimer_;
 
@@ -41,6 +43,8 @@ namespace globalPlanner{
 		// semantic value map parameters
 		double semanticWeight_ = 1.0;  ///< Weight for semantic value in path scoring
 		bool useValueMap_ = true;      ///< Whether to use semantic value map
+		double latestItmScore_ = 0.0;   ///< Latest ITM score from BLIP2 (/blip2/itm_score)
+		bool itmScoreReceived_ = false; ///< Whether we have received at least one ITM score
 
 
 
@@ -71,6 +75,10 @@ namespace globalPlanner{
 		int maxCandidateNum_;
 		double updateDist_;
 		double yawPenaltyWeight_;
+		std::vector<double> height_layers_;  ///< Available height layers for PRM node Z sampling
+		int current_height_layer_idx_;      ///< Current active height layer index (0-based)
+		int cross_layer_links_;             ///< Max cross-layer edges to add per new node (0=disabled)
+		bool just_switched_layer_ = false;  ///< Flag: if true, buildRoadMap does local-only sampling for quick escape
 
 		// data
 		bool odomReceived_ = false;
@@ -100,6 +108,7 @@ namespace globalPlanner{
 
 		void setMap(const GridMap::Ptr& map);
 		void setValueMap(const std::shared_ptr<ValueMap2D>& value_map);
+		bool isValueMapReady() const { return value_map_ && value_map_->isInitialized(); }
 		void loadVelocity(double vel, double angularVel);
 		void initParam();
 		void initModules();
@@ -118,10 +127,13 @@ namespace globalPlanner{
 		void findBestPath(const std::vector<std::vector<std::shared_ptr<PRM::Node>>>& candidatePaths, std::vector<std::shared_ptr<PRM::Node>>& bestPath);
 		bool findPathToPoint(const Eigen::Vector3d& target, std::vector<Eigen::Vector3d>& path_points);
 		void updateRoadmapOnly();
-		
+		void switchHeightLayer();           ///< Cycle to next height layer and log the switch
+		void dropCurrentGoalNode();         ///< Remove current bestPath goal node & edges, clear candidates
+
 
 		// callback functions
 		void odomCB(const nav_msgs::OdometryConstPtr& odom);
+		void itmScoreCB(const std_msgs::Float64ConstPtr& msg);
 		void visCB(const ros::TimerEvent&);
 		void valuemapCB(const ros::TimerEvent&);
 

@@ -3,7 +3,7 @@
 
 #include <queue>
 #include <global_planner/PRMKDTree.h>
-#include <plan_env/grid_map_new.h>
+#include <plan_env/grid_map_indoor.h>
 
 namespace PRM {
     bool inClose(std::shared_ptr<Node> n, const std::unordered_set<std::shared_ptr<Node>>& close);

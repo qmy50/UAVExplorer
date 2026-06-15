@@ -315,6 +315,7 @@ void GridMap::initMap(ros::NodeHandle &nh)
   node_.param("grid_map/p_occ", mp_.p_occ_, 0.80);
   node_.param("grid_map/min_ray_length", mp_.min_ray_length_, -0.1);
   node_.param("grid_map/max_ray_length", mp_.max_ray_length_, -0.1);
+  node_.param("grid_map/max_2d_ray_length", mp_.max_2d_ray_length_, mp_.max_ray_length_);
 
   node_.param("grid_map/visualization_truncate_height", mp_.visualization_truncate_height_, 999.0);
   node_.param("grid_map/virtual_ceil_height", mp_.virtual_ceil_height_, -0.1);
@@ -671,8 +672,8 @@ void GridMap::publish2DOccupancyGrid(){
 
 		int width  = mp_.map_voxel_num_(0);
 		int height = mp_.map_voxel_num_(1);
-		// double z = 1.5f;
-    double z = current_z_;
+		// double z = 1.8f;
+    double z = 1.2f;
 		int zIdx   =  floor((z - mp_.map_origin_(2)) * mp_.resolution_inv_);
 
 		if (!has_2d_map_initialized_) {
@@ -706,6 +707,24 @@ void GridMap::publish2DOccupancyGrid(){
 				Eigen::Vector3i update_min = md_->local_bound_min_ - Eigen::Vector3i(margin, margin, 0);
 				Eigen::Vector3i update_max = md_->local_bound_max_ + Eigen::Vector3i(margin, margin, 0);
 
+				// 使用独立的 max_2d_ray_length 裁剪 2D 地图 XY 更新范围
+				{
+					Eigen::Vector3d cam_pos = md_->camera_pos_;
+					double max_2d_x = cam_pos(0) + mp_.max_2d_ray_length_;
+					double max_2d_y = cam_pos(1) + mp_.max_2d_ray_length_;
+					double min_2d_x = cam_pos(0) - mp_.max_2d_ray_length_;
+					double min_2d_y = cam_pos(1) - mp_.max_2d_ray_length_;
+					Eigen::Vector3i bound_2d_min, bound_2d_max;
+					posToIndex(Eigen::Vector3d(max_2d_x, max_2d_y, 0), bound_2d_max);
+					posToIndex(Eigen::Vector3d(min_2d_x, min_2d_y, 0), bound_2d_min);
+					boundIndex(bound_2d_min);
+					boundIndex(bound_2d_max);
+					update_min(0) = max(update_min(0), bound_2d_min(0));
+					update_min(1) = max(update_min(1), bound_2d_min(1));
+					update_max(0) = min(update_max(0), bound_2d_max(0));
+					update_max(1) = min(update_max(1), bound_2d_max(1));
+				}
+
 				update_min(0) = max(update_min(0), minRangeIdx(0));
 				update_min(1) = max(update_min(1), minRangeIdx(1));
 				update_max(0) = min(update_max(0), width  - 1);
@@ -722,8 +741,9 @@ void GridMap::publish2DOccupancyGrid(){
 								int map2DIdx = x + y * width;
 								int addr = toAddress(pointIdx);
 
-								if (md_->occupancy_buffer_inflate_[addr] > 0 || occupancy_2d_persistent_[map2DIdx] == 100) {
-										// 占据（黑色）
+								// if (md_->occupancy_buffer_inflate_[addr] > 0 || occupancy_2d_persistent_[map2DIdx] == 100)
+                if(md_->occupancy_buffer_inflate_[addr] > 0 ){
+										// 占据（黑色）：仅依靠当前3D膨胀缓冲区，不再持久化历史占据标记
 										occupancy_2d_persistent_[map2DIdx] = 100;
 								} else if (!isUnknown(pointIdx)) {
 										// 自由（白色）：3D缓冲区已知且非占据
@@ -1346,6 +1366,59 @@ Eigen::Vector3d GridMap::closetPointInMap(const Eigen::Vector3d &pt, const Eigen
   return camera_pt + (min_t - 1e-3) * diff;
 }
 
+// void GridMap::clearAndInflateLocalMap()
+// {
+//   // 增量式建图版本：
+//   // 1. 不清除 occupancy_buffer_ 在 local range 之外的区域（保留历史建图结果）
+//   // 2. 只在当前 local bound 范围内重新膨胀障碍物
+
+//   int inf_step = ceil(mp_.obstacles_inflation_ / mp_.resolution_);
+//   vector<Eigen::Vector3i> inf_pts(pow(2 * inf_step + 1, 3));
+//   Eigen::Vector3i inf_pt;
+
+//   // 清除当前 local bound 范围内的膨胀信息（但不重置 occupancy_buffer_）
+//   for (int x = md_->local_bound_min_(0); x <= md_->local_bound_max_(0); ++x)
+//     for (int y = md_->local_bound_min_(1); y <= md_->local_bound_max_(1); ++y)
+//       for (int z = md_->local_bound_min_(2); z <= md_->local_bound_max_(2); ++z)
+//       {
+//         md_->occupancy_buffer_inflate_[toAddress(x, y, z)] = 0;
+//       }
+
+//   // 在当前 local bound 范围内对占据体素进行膨胀
+//   for (int x = md_->local_bound_min_(0); x <= md_->local_bound_max_(0); ++x)
+//     for (int y = md_->local_bound_min_(1); y <= md_->local_bound_max_(1); ++y)
+//       for (int z = md_->local_bound_min_(2); z <= md_->local_bound_max_(2); ++z)
+//       {
+//         if (md_->occupancy_buffer_[toAddress(x, y, z)] > mp_.min_occupancy_log_)
+//         {
+//           inflatePoint(Eigen::Vector3i(x, y, z), inf_step, inf_pts);
+
+//           for (int k = 0; k < (int)inf_pts.size(); ++k)
+//           {
+//             inf_pt = inf_pts[k];
+//             int idx_inf = toAddress(inf_pt);
+//             if (idx_inf < 0 ||
+//                 idx_inf >= mp_.map_voxel_num_(0) * mp_.map_voxel_num_(1) * mp_.map_voxel_num_(2))
+//             {
+//               continue;
+//             }
+//             md_->occupancy_buffer_inflate_[idx_inf] = 1;
+//           }
+//         }
+//       }
+
+//   // add virtual ceiling to limit flight height
+//   // if (mp_.virtual_ceil_height_ > -0.5)
+//   // {
+//   //   int ceil_id = floor((mp_.virtual_ceil_height_ - mp_.map_origin_(2)) * mp_.resolution_inv_);
+//   //   for (int x = md_->local_bound_min_(0); x <= md_->local_bound_max_(0); ++x)
+//   //     for (int y = md_->local_bound_min_(1); y <= md_->local_bound_max_(1); ++y)
+//   //     {
+//   //       md_->occupancy_buffer_inflate_[toAddress(x, y, ceil_id)] = 1;
+//   //     }
+//   // }
+// }
+
 void GridMap::clearAndInflateLocalMap()
 {
   /*clear outside local*/
@@ -1428,12 +1501,12 @@ void GridMap::clearAndInflateLocalMap()
   Eigen::Vector3i inf_pt;
 
   // clear outdated data
-  for (int x = md_->local_bound_min_(0); x <= md_->local_bound_max_(0); ++x)
-    for (int y = md_->local_bound_min_(1); y <= md_->local_bound_max_(1); ++y)
-      for (int z = md_->local_bound_min_(2); z <= md_->local_bound_max_(2); ++z)
-      {
-        md_->occupancy_buffer_inflate_[toAddress(x, y, z)] = 0;
-      }
+  // for (int x = md_->local_bound_min_(0); x <= md_->local_bound_max_(0); ++x)
+  //   for (int y = md_->local_bound_min_(1); y <= md_->local_bound_max_(1); ++y)
+  //     for (int z = md_->local_bound_min_(2); z <= md_->local_bound_max_(2); ++z)
+  //     {
+  //       md_->occupancy_buffer_inflate_[toAddress(x, y, z)] = 0;
+  //     }
 
   // inflate obstacles
   for (int x = md_->local_bound_min_(0); x <= md_->local_bound_max_(0); ++x)
@@ -1460,15 +1533,15 @@ void GridMap::clearAndInflateLocalMap()
       }
 
   // add virtual ceiling to limit flight height
-  if (mp_.virtual_ceil_height_ > -0.5)
-  {
-    int ceil_id = floor((mp_.virtual_ceil_height_ - mp_.map_origin_(2)) * mp_.resolution_inv_);
-    for (int x = md_->local_bound_min_(0); x <= md_->local_bound_max_(0); ++x)
-      for (int y = md_->local_bound_min_(1); y <= md_->local_bound_max_(1); ++y)
-      {
-        md_->occupancy_buffer_inflate_[toAddress(x, y, ceil_id)] = 1;
-      }
-  }
+  // if (mp_.virtual_ceil_height_ > -0.5)
+  // {
+  //   int ceil_id = floor((mp_.virtual_ceil_height_ - mp_.map_origin_(2)) * mp_.resolution_inv_);
+  //   for (int x = md_->local_bound_min_(0); x <= md_->local_bound_max_(0); ++x)
+  //     for (int y = md_->local_bound_min_(1); y <= md_->local_bound_max_(1); ++y)
+  //     {
+  //       md_->occupancy_buffer_inflate_[toAddress(x, y, ceil_id)] = 1;
+  //     }
+  // }
 }
 
 void GridMap::visCallback(const ros::TimerEvent & /*event*/)
@@ -1600,8 +1673,8 @@ void GridMap::cloudCallback(const sensor_msgs::PointCloud2ConstPtr &img)
   
   // 注意：不再调用 resetBuffer！增量更新，不清除历史数据
 
-    this->resetBuffer(md_->camera_pos_ - mp_.local_update_range_,
-                    md_->camera_pos_ + mp_.local_update_range_);
+    // this->resetBuffer(md_->camera_pos_ - mp_.local_update_range_,
+    //                 md_->camera_pos_ + mp_.local_update_range_);
 
   pcl::PointXYZ pt;
   Eigen::Vector3d p3d, p3d_inf;
@@ -1881,8 +1954,11 @@ void GridMap::publishMapInflate(bool all_info)
   pcl::PointXYZ pt;
   pcl::PointCloud<pcl::PointXYZ> cloud;
 
-  Eigen::Vector3i min_cut = md_->local_bound_min_;
-  Eigen::Vector3i max_cut = md_->local_bound_max_;
+  // Eigen::Vector3i min_cut = md_->local_bound_min_;
+  // Eigen::Vector3i max_cut = md_->local_bound_max_;
+
+  Eigen::Vector3i min_cut = Eigen::Vector3i::Zero();
+  Eigen::Vector3i max_cut = mp_.map_voxel_num_ - Eigen::Vector3i::Ones();
 
   if (all_info)
   {

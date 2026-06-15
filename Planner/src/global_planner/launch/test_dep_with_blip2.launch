@@ -1,0 +1,38 @@
+<launch>
+    <!-- ==================================================================
+    test_dep_with_blip2.launch
+    一键启动: BLIP2 Flask 服务器 + DEP 探索规划器 + ITM ROS 节点
+
+    架构:
+      1. start_blip2_server.sh --foreground   (conda torch env, Flask)
+      2. test_dep_node                         (C++ DEP planner)
+      3. blip2_itm_node.py                     (HTTP client → Flask)
+
+    手动启动方式（分步）:
+      # 终端 1: 启动 Flask 服务器
+      rosrun global_planner start_blip2_server.sh --foreground 12182
+
+      # 终端 2: 启动规划器
+      roslaunch global_planner test_dep.launch
+    ================================================================== -->
+
+    <!-- 1. BLIP2 Flask 服务器 (conda torch env, 前台运行) -->
+    <node pkg="global_planner" type="start_blip2_server.sh"
+          name="blip2_flask_server" output="screen" required="true"
+          args="--foreground 12182" />
+
+    <!-- 2. DEP 规划器参数 -->
+    <rosparam file="$(find global_planner)/cfg/dep_param.yaml" ns="/DEP"/>
+    <rosparam file="$(find global_planner)/cfg/dynamic_map_param.yaml" ns="/dynamic_map"/>
+    <rosparam file="$(find global_planner)/cfg/dynamic_detector_param.yaml" ns="/onboard_detector" />
+    <node pkg="global_planner" type="test_dep_node" name="test_dep_node" output="screen" />
+
+    <!-- 3. BLIP2 ITM ROS 节点（HTTP 客户端） -->
+    <node pkg="global_planner" type="blip2_itm_node.py" name="blip2_itm_node" output="screen">
+        <param name="rgb_topic" value="/camera/rgb/image_raw"/>
+        <param name="label" value="chair"/>
+        <param name="room" value="everywhere"/>
+        <param name="publish_rate" value="2.0"/>
+        <param name="server_port" value="12182"/>
+    </node>
+</launch>

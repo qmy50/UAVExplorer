@@ -23,7 +23,8 @@
 
 #include "utils/minco.hpp"
 #include <path_searching/dyn_a_star_new.h>
-#include <plan_env/grid_map_new.h>
+// #include <plan_env/grid_map_indoor.h>
+#include <plan_env/grid_map_indoor.h>
 
 
 class PathPlannerSim3D{

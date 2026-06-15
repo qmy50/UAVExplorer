@@ -265,6 +265,7 @@ PathPlannerSim3D::PathPlannerSim3D(ros::NodeHandle &nh,const int& id)
         //     step_size = grid_map_->getResolution() + 0.2;
         //     //ROS_WARN("DID NOT USED");
         // }
+        step_size = grid_map_->getResolution();
         int flag = a_star_->AstarSearch(step_size, start_position, end_position);
 
         if(flag == ASTAR_RET::SUCCESS){

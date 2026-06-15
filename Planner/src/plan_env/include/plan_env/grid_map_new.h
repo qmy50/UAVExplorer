@@ -70,7 +70,7 @@ struct MappingParameters {
 
   double p_hit_, p_miss_, p_min_, p_max_, p_occ_;
   double prob_hit_log_, prob_miss_log_, clamp_min_log_, clamp_max_log_, min_occupancy_log_;
-  double min_ray_length_, max_ray_length_;
+  double min_ray_length_, max_ray_length_, max_2d_ray_length_;
 
   int local_map_margin_;
   double visualization_truncate_height_, virtual_ceil_height_, ground_height_;

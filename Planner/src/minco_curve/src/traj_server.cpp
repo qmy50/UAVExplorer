@@ -7,7 +7,9 @@
 #include <std_msgs/Bool.h>
 #include <ros/ros.h>
 #include <tf/tf.h>
+#include <actionlib/server/simple_action_server.h>
 #include "minco_curve/RotateDrone.h"
+#include "minco_curve/RotateDroneAction.h"
 
 using namespace Eigen;
 
@@ -33,6 +35,7 @@ Eigen::Vector3d last_cmd_pos_;
 double max_vel_,max_acc_;
 double pos_jump_thresh_;
 double current_yaw_ = 0.0f;
+Eigen::Vector3d odom_pos_(0, 0, 0);  // for heartbeat hover fallback
 
 
 // yaw control
@@ -45,6 +48,13 @@ double rotation_start_yaw_,rotation_target_yaw_,rotation_speed_;
 double rotation_total_yaw_;  // signed total rotation angle (original req.angle_rad)
 Eigen::Vector3d hover_position_;
 ros::Time rotation_start_time_;
+
+// action server for rotation (replaces synchronous service)
+typedef actionlib::SimpleActionServer<minco_curve::RotateDroneAction> RotateActionServer;
+boost::shared_ptr<RotateActionServer> rotate_action_server_;
+minco_curve::RotateDroneFeedback rotate_feedback_;
+minco_curve::RotateDroneResult rotate_result_;
+bool rotate_action_active_ = false;
 
 
 void heartbeatCallback(std_msgs::EmptyPtr msg)
@@ -172,10 +182,33 @@ void normalizeYaw(double& yaw) {
 
 void cmdCallback(const ros::TimerEvent &e)
 {
-  /* no publishing before receive traj_ */
-  if (!receive_traj_ && !rotation_ing_)
+  /* ━━━ 心跳悬停：无轨迹、无旋转时保持在当前位置 ━━━
+     始终发布悬停指令，防止 PX4 offboard 超时降落 */
+  if (!receive_traj_ && !rotation_ing_) {
+    ros::Time time_now = ros::Time::now();
+    cmd.header.stamp = time_now;
+    cmd.header.frame_id = "world";
+    cmd.trajectory_flag = quadrotor_msgs::PositionCommand::TRAJECTORY_STATUS_READY;
+    cmd.trajectory_id = traj_id_;
+    // 优先用上次指令位置，没有则用 odom 当前位置
+    // Eigen::Vector3d hover_pos = have_last_cmd_pos_ ? last_cmd_pos_ : odom_pos_;
+    Eigen::Vector3d hover_pos = odom_pos_;
+    cmd.position.x = hover_pos(0);
+    cmd.position.y = hover_pos(1);
+    cmd.position.z = hover_pos(2);
+    cmd.velocity.x = 0;
+    cmd.velocity.y = 0;
+    cmd.velocity.z = 0;
+    cmd.acceleration.x = 0;
+    cmd.acceleration.y = 0;
+    cmd.acceleration.z = 0;
+    cmd.yaw = last_yaw_;
+    cmd.yaw_dot = 0;
+    pose_cmd_pub.publish(cmd);
+    have_last_cmd_pos_ = true;  // 确保下次也是 true
+    last_cmd_pos_ = hover_pos;
     return;
-  
+  }
 
   ros::Time time_now = ros::Time::now();
   double t_cur = (time_now - start_time_).toSec();
@@ -183,28 +216,39 @@ void cmdCallback(const ros::TimerEvent &e)
   Eigen::Vector3d pos(Eigen::Vector3d::Zero()), vel(Eigen::Vector3d::Zero()), acc(Eigen::Vector3d::Zero()), pos_f;
   std::pair<double, double> yaw_yawdot(0, 0);
 
-
-
   static ros::Time time_last = ros::Time::now();
   if(rotation_ing_){
     double dt = (ros::Time::now()-rotation_start_time_).toSec();
-    // Signed speed: positive = CCW, negative = CW (determined by angle_rad sign)
-    double delta_yaw = rotation_speed_ * dt;
-    // Check completion: compare signed progress against signed total angle
-    if (fabs(delta_yaw) >= fabs(rotation_total_yaw_)) {
-        // Rotation complete: snap to exact target yaw
+    double delta_yaw = (rotation_speed_-0.2) * dt;
+
+    // odom yaw 实际转了多少（处理 ±π 跨象限）
+    double odom_delta = current_yaw_ - rotation_start_yaw_;
+    while (odom_delta > M_PI)  odom_delta -= 2 * M_PI;
+    while (odom_delta < -M_PI) odom_delta += 2 * M_PI;
+    if ((rotation_speed_ < 0 && odom_delta > 0) || (rotation_speed_ > 0 && odom_delta < 0))
+        odom_delta = -odom_delta;  // 保证方向一致
+
+    bool time_done = fabs(delta_yaw) >= fabs(rotation_total_yaw_);
+    bool odom_done = odom_delta >= fabs(rotation_total_yaw_) ;
+
+    if (odom_done) {
         rotation_ing_ = false;
         last_yaw_ = rotation_target_yaw_;
         last_yawdot_ = 0.0;
         yaw_yawdot = {rotation_target_yaw_, 0.0};
-        ROS_INFO("Rotation done. Final yaw: %.2f", rotation_target_yaw_);
+        ROS_INFO("Rotation done. yaw=%.2f (t=%.2fs o=%.1f° s=%.1f°)",
+                 rotation_target_yaw_, dt,
+                 odom_delta * 180.0 / M_PI, delta_yaw * 180.0 / M_PI);
+
+        // setSucceeded handled by rotateActionGoalCB (blocking execute callback)
     } else {
-        // Still rotating: compute current yaw (no normalizeYaw to avoid ±π jump)
         double target_yaw = rotation_start_yaw_ + delta_yaw;
         pos = hover_position_;
         vel.setZero();
         acc.setZero();
         yaw_yawdot = {target_yaw, rotation_speed_};
+
+        // feedback handled by action server
     }
   }else{
     if (t_cur < traj_duration_ && t_cur >= 0.0)
@@ -289,7 +333,7 @@ void cmdCallback(const ros::TimerEvent &e)
     bool publish_pose_cmd = false;
     g_nh->param<bool>("/publish_pose_cmd",publish_pose_cmd,true);
     if (publish_pose_cmd){
-      pose_cmd_pub.publish(pose_cmd);
+        pose_cmd_pub.publish(pose_cmd);
       }
   }
   if (publish_cmd_vel) {
@@ -308,7 +352,7 @@ void cmdCallback(const ros::TimerEvent &e)
     //vel_cmd.angular.z = yaw_yawdot.second;  
 
     cmd_vel_pub_.publish(vel_cmd);
-    ROS_WARN_THROTTLE(1.0, "Send vel command (body frame)");
+    // ROS_WARN_THROTTLE(1.0, "Send vel command (body frame)");
   }
 
 }
@@ -319,6 +363,7 @@ void odometryCallback(const nav_msgs::OdometryConstPtr &msg)
   tf::Quaternion q(msg->pose.pose.orientation.x,msg->pose.pose.orientation.y,
                    msg->pose.pose.orientation.z,msg->pose.pose.orientation.w);
   current_yaw_ = tf::getYaw(q);
+  odom_pos_ << msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z;
 }
 
 bool handleRotate(minco_curve::RotateDrone::Request& req,minco_curve::RotateDrone::Response& res){
@@ -356,6 +401,66 @@ bool handleRotate(minco_curve::RotateDrone::Request& req,minco_curve::RotateDron
     return true;
 }
 
+
+// ━━━━━━━━━━━ Action server callbacks (for traj_server to notify FSM when rotation done) ━━━━━━━━━━━
+
+void rotateActionGoalCB(const minco_curve::RotateDroneGoalConstPtr& goal)
+{
+    if (fabs(goal->angle_rad) < 1e-6) {
+        rotate_result_.success = false;
+        rotate_result_.final_yaw = 0.0;
+        rotate_result_.message = "Rotation angle too small";
+        rotate_action_server_->setAborted(rotate_result_);
+        return;
+    }
+
+    // Start rotation (cmdCallback runs at 100Hz in main thread)
+    rotation_start_yaw_ = goal->angle_start;
+    rotation_total_yaw_ = goal->angle_rad;
+    rotation_target_yaw_ = rotation_start_yaw_ + rotation_total_yaw_;
+    rotation_speed_ = (goal->angle_rad >= 0) ? fabs(goal->speed_rad_sec) : -fabs(goal->speed_rad_sec);
+    hover_position_ << goal->pos_x, goal->pos_y, goal->pos_z;
+    rotation_start_time_ = ros::Time::now();
+    rotation_ing_ = true;
+
+    ROS_INFO("[RotateAction] Goal: %.1f deg at %.1f rad/s, yaw %.1f -> %.1f",
+             goal->angle_rad * 180.0 / M_PI, goal->speed_rad_sec,
+             rotation_start_yaw_ * 180.0 / M_PI, rotation_target_yaw_ * 180.0 / M_PI);
+
+    // Block until cmdCallback finishes the rotation
+    ros::Rate rate(50);
+    while (rotation_ing_ && ros::ok()) {
+        if (rotate_action_server_->isPreemptRequested()) {
+            rotation_ing_ = false;
+            rotate_result_.success = false;
+            rotate_result_.final_yaw = last_yaw_;
+            rotate_result_.message = "Rotation preempted";
+            rotate_action_server_->setPreempted(rotate_result_);
+            ROS_WARN("[RotateAction] Preempted by new goal");
+            return;
+        }
+        rate.sleep();
+    }
+
+    rotate_result_.success = true;
+    rotate_result_.final_yaw = rotation_target_yaw_;
+    rotate_result_.message = "Rotation complete";
+    rotate_action_server_->setSucceeded(rotate_result_);
+    ROS_INFO("[RotateAction] Succeeded, final yaw=%.1f deg", rotation_target_yaw_ * 180.0 / M_PI);
+}
+
+void rotateActionPreemptCB()
+{
+    ROS_WARN("[RotateAction] Preempted — cancelling rotation");
+    rotation_ing_ = false;
+    rotate_action_active_ = false;
+    rotate_result_.success = false;
+    rotate_result_.final_yaw = last_yaw_;
+    rotate_result_.message = "Rotation preempted";
+    rotate_action_server_->setPreempted(rotate_result_);
+}
+
+
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "traj_server");
@@ -370,7 +475,16 @@ int main(int argc, char **argv)
 
   ros::Subscriber odom_sub_ = nh.subscribe("odom_world",10,odometryCallback);
   // ros::Subscriber rotation_sub_ = nh.subscribe("/start_rotation",10,rotationCallback);
-  ros::ServiceServer service = nh.advertiseService("/rotate_drone",handleRotate);
+  ros::ServiceServer service = nh.advertiseService("/rotate_drone", handleRotate);
+
+  // Action server: traj_server notifies client when rotation actually completes
+  rotate_action_server_.reset(
+      new RotateActionServer(nh, "/rotate_drone_action",
+                             boost::bind(&rotateActionGoalCB,_1),   // execute callback: void(const GoalConstPtr&)
+                             false));
+  // preempt handled inside rotateActionGoalCB via isPreemptRequested()
+  rotate_action_server_->start();
+  ROS_INFO("[Traj server] RotateDrone action server ready.");
 
   pos_cmd_pub = nh.advertise<quadrotor_msgs::PositionCommand>("position_cmd", 50);
 
@@ -398,4 +512,3 @@ int main(int argc, char **argv)
 
   return 0;
 }
-

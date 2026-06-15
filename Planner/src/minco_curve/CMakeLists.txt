@@ -15,9 +15,11 @@ find_package(catkin REQUIRED COMPONENTS
     tf
     tf2_ros
     plan_env
-    path_searching 
+    path_searching
     onboard_detector
     global_planner
+    actionlib
+    actionlib_msgs
 )
 
 # PCL
@@ -36,9 +38,16 @@ add_service_files(
   FILES
   RotateDrone.srv
 )
+
+add_action_files(
+  FILES
+  RotateDrone.action
+)
+
 generate_messages(
   DEPENDENCIES
   std_msgs
+  actionlib_msgs
 )
 
 catkin_package(
@@ -48,21 +57,36 @@ catkin_package(
 )
 
 
-add_executable(fake_explorer_node 
+# add_executable(fake_explorer_node 
+#     src/fake_explorer_node.cpp
+#     src/fake_explorer_fsm.cpp
+#     src/plan_manager.cpp
+#     src/traj_optimizer_3D.cpp)
+
+# # 链接库（仅链接实际需要的）
+# target_link_libraries(fake_explorer_node
+#     ${catkin_LIBRARIES}
+#     ${PCL_LIBRARIES}
+# )
+
+add_executable(fake_explorer_indoor_node
     src/fake_explorer_node.cpp
-    src/fake_explorer_fsm.cpp
+    src/fake_explorer_fsm_indoor.cpp
     src/plan_manager.cpp
-    src/traj_optimizer_3D.cpp
-    src/simple_dwa.cpp)
+    src/traj_optimizer_3D.cpp)
+
+add_dependencies(fake_explorer_indoor_node ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
 # 链接库（仅链接实际需要的）
-target_link_libraries(fake_explorer_node
+target_link_libraries(fake_explorer_indoor_node
     ${catkin_LIBRARIES}
     ${PCL_LIBRARIES}
 )
 
 
 add_executable(traj_server_node src/traj_server.cpp)
+
+add_dependencies(traj_server_node ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
 # 链接库（仅链接实际需要的）
 target_link_libraries(traj_server_node

@@ -383,7 +383,7 @@ vector<Vector3d> AStar::getPath()
     reverse(path.begin(), path.end());
 
     // RDP 剪枝：去除共线/近共线的
-    //rdpSimplify(path,simplified_path,rdp_epsilon,0,path.size()-1);
-    //ROS_WARN("The path size is %d",simplified_path.size());
+    rdpSimplify(path,simplified_path,rdp_epsilon,0,path.size()-1);
+    ROS_WARN("The path size is %d",simplified_path.size());
     return path;
 }

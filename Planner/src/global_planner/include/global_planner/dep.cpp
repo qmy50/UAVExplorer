@@ -45,7 +45,7 @@ namespace globalPlanner{
 		// odom topic name
 		if (not this->nh_.getParam(this->ns_ + "/odom_topic", this->odomTopic_)){
 			// this->odomTopic_ = "/drone_0_visual_slam/odom";
-			this->odomTopic_ = "/iris_0/mavros/odometry/in";
+			// this->odomTopic_ = "/iris_0/mavros/odometry/in";
 			cout << this->hint_ << ": No odom topic name. Use default: /CERLAB/quadcopter/odom" << endl;
 		}
 		else{
@@ -600,81 +600,81 @@ namespace globalPlanner{
 	void DEP::detectFrontierRegion(std::vector<std::pair<Eigen::Vector3d, double>>& frontierPointPairs) {
     	frontierPointPairs.clear();
 
-		// if (use2DMap_ && map_->is2DMapReady()) {
-		// 	const auto& grid = map_->get2DOccupancyGrid();
+		if (use2DMap_ && map_->is2DMapReady()) {
+			const auto& grid = map_->get2DOccupancyGrid();
 			
-		// 	double gridOriginX = grid.info.origin.position.x;
-		// 	double gridOriginY = grid.info.origin.position.y;
-		// 	double res = this->map_->getRes();
+			double gridOriginX = grid.info.origin.position.x;
+			double gridOriginY = grid.info.origin.position.y;
+			double res = this->map_->getRes();
 			
-		// 	// 已探索区域范围（世界坐标）
-		// 	Eigen::Vector3d mapMin, mapMax;
-		// 	this->map_->getCurrMapRange(mapMin, mapMax);
+			// 已探索区域范围（世界坐标）
+			Eigen::Vector3d mapMin, mapMax;
+			this->map_->getCurrMapRange(mapMin, mapMax);
 
-		// 	// 计算已探索区域在图像中的像素范围
-		// 	// 注意：cv::Mat 的 row 0 对应 grid data 的 y=0（即世界坐标最小的 y，在图像顶部）
-		// 	int roi_x = max(0, int(floor((mapMin(0) - gridOriginX) / res)));
-		// 	int roi_y = max(0, int(floor((mapMin(1) - gridOriginY) / res)));
-		// 	int roi_x_end = min(int(grid.info.width) - 1, int(floor((mapMax(0) - gridOriginX) / res)));
-		// 	int roi_y_end = min(int(grid.info.height) - 1, int(floor((mapMax(1) - gridOriginY) / res)));
+			// 计算已探索区域在图像中的像素范围
+			// 注意：cv::Mat 的 row 0 对应 grid data 的 y=0（即世界坐标最小的 y，在图像顶部）
+			int roi_x = max(0, int(floor((mapMin(0) - gridOriginX) / res)));
+			int roi_y = max(0, int(floor((mapMin(1) - gridOriginY) / res)));
+			int roi_x_end = min(int(grid.info.width) - 1, int(floor((mapMax(0) - gridOriginX) / res)));
+			int roi_y_end = min(int(grid.info.height) - 1, int(floor((mapMax(1) - gridOriginY) / res)));
 
-		// 	// 【关键修复】创建二值图像：未知区域=255(白), 其他=0(黑)
-		// 	// 只在已探索区域附近标记未知像素，远离已探索区域的未知区域不算前沿
-		// 	cv::Mat im(grid.info.height, grid.info.width, CV_8UC1, cv::Scalar(0));
-		// 	for (int y = roi_y; y <= roi_y_end; ++y) {
-		// 		for (int x = roi_x; x <= roi_x_end; ++x) {
-		// 			int idx = y * grid.info.width + x;
-		// 			if (grid.data[idx] == -1)  // unknown
-		// 				im.data[idx] = 255;
-		// 		}
-		// 	}
+			// 【关键修复】创建二值图像：未知区域=255(白), 其他=0(黑)
+			// 只在已探索区域附近标记未知像素，远离已探索区域的未知区域不算前沿
+			cv::Mat im(grid.info.height, grid.info.width, CV_8UC1, cv::Scalar(0));
+			for (int y = roi_y; y <= roi_y_end; ++y) {
+				for (int x = roi_x; x <= roi_x_end; ++x) {
+					int idx = y * grid.info.width + x;
+					if (grid.data[idx] == -1)  // unknown
+						im.data[idx] = 255;
+				}
+			}
 
-		// 	cv::SimpleBlobDetector::Params params;
-		// 	params.filterByColor = true;
-		// 	params.blobColor = 255;  // 检测白色 blob（即未知区域）
-		// 	params.filterByArea = true;
-		// 	params.minArea = pow(0.5 / res, 2);
-		// 	params.maxArea = grid.info.width * grid.info.height;
-		// 	params.filterByCircularity = false;
-		// 	params.filterByConvexity = false;
-		// 	// 阈值范围：从高到低扫描，让值=255的未知区域在各阈值下都是前景
-		// 	params.minThreshold = 200;
-		// 	params.maxThreshold = 255;
-		// 	params.thresholdStep = 10;
-		// 	cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(params);
+			cv::SimpleBlobDetector::Params params;
+			params.filterByColor = true;
+			params.blobColor = 255;  // 检测白色 blob（即未知区域）
+			params.filterByArea = true;
+			params.minArea = pow(0.5 / res, 2);
+			params.maxArea = 0.3*grid.info.width * grid.info.height;
+			params.filterByCircularity = false;
+			params.filterByConvexity = false;
+			// 阈值范围：从高到低扫描，让值=255的未知区域在各阈值下都是前景
+			params.minThreshold = 200;
+			params.maxThreshold = 255;
+			params.thresholdStep = 10;
+			cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(params);
 
-		// 	double h = this->position_(2);
-		// 	h = std::max(this->globalRegionMin_(2), std::min(h, this->globalRegionMax_(2)));
+			double h = this->position_(2);
+			h = std::max(this->globalRegionMin_(2), std::min(h, this->globalRegionMax_(2)));
 
-		// 	std::vector<cv::KeyPoint> keypoints;
-		// 	detector->detect(im, keypoints);
+			std::vector<cv::KeyPoint> keypoints;
+			detector->detect(im, keypoints);
 
-		// 	for (const auto& kp : keypoints) {
-		// 		Eigen::Vector3d p(gridOriginX + kp.pt.x * res,
-		// 						gridOriginY + kp.pt.y * res,
-		// 						h);
-		// 		double dist = kp.size * res;
-		// 		frontierPointPairs.push_back({p, dist});
-		// 	}
+			for (const auto& kp : keypoints) {
+				Eigen::Vector3d p(gridOriginX + kp.pt.x * res,
+								gridOriginY + kp.pt.y * res,
+								h);
+				double dist = kp.size * res;
+				frontierPointPairs.push_back({p, dist});
+			}
 
-		// 	// 可视化：显示原始三值图 + 检测框 + 检测结果
-		// 	cv::Mat im_vis(grid.info.height, grid.info.width, CV_8UC1);
-		// 	for (size_t i = 0; i < grid.data.size(); ++i) {
-		// 		if (grid.data[i] == -1) im_vis.data[i] = 50;
-		// 		else if (grid.data[i] == 0) im_vis.data[i] = 255;
-		// 		else im_vis.data[i] = 0;
-		// 	}
-		// 	// 在可视化图上画矩形框标示已探索区域范围
-		// 	cv::Rect roi_rect(roi_x, roi_y, roi_x_end - roi_x + 1, roi_y_end - roi_y + 1);
-		// 	cv::rectangle(im_vis, roi_rect, cv::Scalar(128), 2);
-		// 	cv::Mat im_with_keypoints;
-		// 	cv::drawKeypoints(im_vis, keypoints, im_with_keypoints, cv::Scalar(0, 0, 255),
-		// 					cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-		// 	cv::imshow("Frontier Blob Detection", im_with_keypoints);
-		// 	cv::waitKey(1);
-		// } else {
-		// 	ROS_ERROR("2D map not ready for blob detection!");
-		// }
+			// 可视化：显示原始三值图 + 检测框 + 检测结果
+			// cv::Mat im_vis(grid.info.height, grid.info.width, CV_8UC1);
+			// for (size_t i = 0; i < grid.data.size(); ++i) {
+			// 	if (grid.data[i] == -1) im_vis.data[i] = 50;
+			// 	else if (grid.data[i] == 0) im_vis.data[i] = 255;
+			// 	else im_vis.data[i] = 0;
+			// }
+			// 在可视化图上画矩形框标示已探索区域范围
+			// cv::Rect roi_rect(roi_x, roi_y, roi_x_end - roi_x + 1, roi_y_end - roi_y + 1);
+			// cv::rectangle(im_vis, roi_rect, cv::Scalar(128), 2);
+			// cv::Mat im_with_keypoints;
+			// cv::drawKeypoints(im_vis, keypoints, im_with_keypoints, cv::Scalar(0, 0, 255),
+			// 				cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+			// cv::imshow("Frontier Blob Detection", im_with_keypoints);
+			// cv::waitKey(1);
+		} else {
+			ROS_ERROR("2D map not ready for blob detection!");
+		}
 	}
 
 
@@ -705,7 +705,21 @@ namespace globalPlanner{
 				int countSampleOnce = 0;
 				for (std::shared_ptr<PRM::Node> fnNN : fnNeighbors){
 					n = this->extendNode(fnNN, fn);
-					if (this->isPosValid(n->pos, this->safeDistXY_, this->safeDistZ_)){
+					bool is2DFreeValid = false;
+					if (use2DMap_ && map_->is2DMapReady()) {
+						is2DFreeValid = true;
+						for (double x = n->pos(0) - this->safeDistXY_; x <= n->pos(0) + this->safeDistXY_; x += map_->getRes()) {
+							for (double y = n->pos(1) - this->safeDistXY_; y <= n->pos(1) + this->safeDistXY_; y += map_->getRes()) {
+								if (!map_->is2DFree(x, y)) {
+									is2DFreeValid = false;
+									break;
+								}
+							}
+							if (!is2DFreeValid) break;
+						}
+					}
+					if (is2DFreeValid){
+					// if (this->isPosValid(n->pos, this->safeDistXY_, this->safeDistZ_)){
 						std::shared_ptr<PRM::Node> nn = this->roadmap_->nearestNeighbor(n);
 						double distToNN = (n->pos - nn->pos).norm();
 						if (distToNN >= this->distThresh_){
@@ -734,32 +748,32 @@ namespace globalPlanner{
 				int countFailureGlobal = 0;
 				saturate = true;
 				// Generate new node
-				// while (ros::ok()){
-				// 	if (countFailureGlobal > this->globalSampleThresh_){
-				// 		saturate = true;
-				// 		break;
-				// 	}
-				// 	n = this->randomConfigBBox(this->globalRegionMin_, this->globalRegionMax_);
-				// 	// Check how close new node is other nodes
-				// 	double distToNN;
-				// 	if (this->roadmap_->getSize() != 0){
-				// 		shared_ptr<PRM::Node> nn = this->roadmap_->nearestNeighbor(n);
-				// 		distToNN = (n->pos - nn->pos).norm();
-				// 	}
-				// 	else{
-				// 		distToNN = this->distThresh_;
-				// 	}
-				// 	if (distToNN < this->distThresh_){
-				// 		++countFailureGlobal;
-				// 	}
-				// 	else{
-				// 		this->roadmap_->insert(n);
-				// 		newNodes.push_back(n);
-				// 		// this->prmNodeVec_.push_back(n);
-				// 		this->prmNodeVec_.insert(n);
-				// 		++countSample;
-				// 	}
-				// }
+				while (ros::ok()){
+					if (countFailureGlobal > this->globalSampleThresh_){
+						saturate = true;
+						break;
+					}
+					n = this->randomConfigBBox(this->globalRegionMin_, this->globalRegionMax_);
+					// Check how close new node is other nodes
+					double distToNN;
+					if (this->roadmap_->getSize() != 0){
+						shared_ptr<PRM::Node> nn = this->roadmap_->nearestNeighbor(n);
+						distToNN = (n->pos - nn->pos).norm();
+					}
+					else{
+						distToNN = this->distThresh_;
+					}
+					if (distToNN < this->distThresh_){
+						++countFailureGlobal;
+					}
+					else{
+						this->roadmap_->insert(n);
+						newNodes.push_back(n);
+						// this->prmNodeVec_.push_back(n);
+						this->prmNodeVec_.insert(n);
+						++countSample;
+					}
+				}
 			}
 			else{
 				if (true){
@@ -1038,8 +1052,9 @@ namespace globalPlanner{
 			yawDist += globalPlanner::angleDiff(prevYaw, path.back()->getBestYaw());
 
 			double distance = this->calculatePathLength(path);
+			ROS_WARN("CUrrent path length: %f",distance);
 			// cout << "total is distance is: " << distance << " total yaw distance is: " << yawDist << " voxel: " << path.back()->numVoxels << endl;
-			double pathTime = distance/this->vel_ + this->yawPenaltyWeight_ * yawDist/this->angularVel_;
+			double pathTime = 2 * distance/this->vel_ + this->yawPenaltyWeight_ * yawDist/this->angularVel_;
 			
 			// Semantic value bonus from ValueMap2D
 			double semanticValue = 0.0;
@@ -1053,7 +1068,8 @@ namespace globalPlanner{
 				if (distance > 1e-3) semanticValue /= distance;
 			}
 			
-			double score = double(unknownVoxel)/pathTime + semanticWeight_ * semanticValue;
+			// double score = double(unknownVoxel)/pathTime + semanticWeight_ * semanticValue;
+			double score = double(unknownVoxel)/pathTime;
 			// cout << "unknown for path: " << n <<  " is: " << unknownVoxel << " score: " << score << " distance: " << distance << " Time: " << pathTime <<  " Last total unknown: " << path.back()->numVoxels << " last best: " << path.back()->getBestYawVoxel() << endl;
 			if (score > highestScore){
 				highestScore = score;
@@ -1239,11 +1255,13 @@ namespace globalPlanner{
 			p(1) = globalPlanner::randomNumber(minSampleRegion(1), maxSampleRegion(1));
 			// In 2D map mode, fix Z to current drone height (2D map is a single plane)
 			if (use2DMap_ && map_->is2DMapReady()) {
-				p(2) = this->position_(2);
-				p(2) = std::max(this->globalRegionMin_(2), std::min(p(2), this->globalRegionMax_(2)));
+				// p(2) = this->position_(2);
+				p(2) = 1.5f;
+				//p(2) = std::max(this->globalRegionMin_(2), std::min(p(2), this->globalRegionMax_(2)));
 				valid = map_->is2DFree(p(0), p(1));
 			} else {
-				p(2) = globalPlanner::randomNumber(minSampleRegion(2), maxSampleRegion(2));
+				// p(2) = globalPlanner::randomNumber(minSampleRegion(2), maxSampleRegion(2));
+				p(2) = 1.5f;
 				valid = this->isPosValid(p, this->safeDistXY_, this->safeDistZ_);
 			}
 			++sampleAttempts;

@@ -1,6 +1,27 @@
-<launch>	
-	<rosparam file="$(find global_planner)/cfg/dep_param.yaml" ns="/DEP"/>
-	<rosparam file="$(find global_planner)/cfg/dynamic_map_param.yaml" ns="/dynamic_map"/>
-	<rosparam file="$(find global_planner)/cfg/dynamic_detector_param.yaml" ns="/onboard_detector" />
-	<node pkg="global_planner" type="test_dep_node" name="test_dep_node" output="screen" />
+<launch>
+    <!-- ==================================================================
+    test_dep.launch
+    DEP 探索规划器 + BLIP2 ITM 节点（不含 Flask 服务器）
+
+    前提: BLIP2 Flask 服务器必须已经在运行！
+    先手动启动 Flask 服务器:
+        rosrun global_planner start_blip2_server.sh
+
+    或者使用一键启动:
+        roslaunch global_planner test_dep_with_blip2.launch
+    ================================================================== -->
+
+    <rosparam file="$(find global_planner)/cfg/dep_param.yaml" ns="/DEP"/>
+    <rosparam file="$(find global_planner)/cfg/dynamic_map_param.yaml" ns="/dynamic_map"/>
+    <rosparam file="$(find global_planner)/cfg/dynamic_detector_param.yaml" ns="/onboard_detector" />
+    <node pkg="global_planner" type="test_dep_node" name="test_dep_node" output="screen" />
+
+    <!-- BLIP2 ITM node: HTTP client → Flask server (must be running on port 12182) -->
+    <node pkg="global_planner" type="blip2_itm_node.py" name="blip2_itm_node" output="screen">
+        <param name="rgb_topic" value="/camera/rgb/image_raw"/>
+        <param name="label" value="chair"/>
+        <param name="room" value="everywhere"/>
+        <param name="publish_rate" value="2.0"/>
+        <param name="server_port" value="12182"/>
+    </node>
 </launch>

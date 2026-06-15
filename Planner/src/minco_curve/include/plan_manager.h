@@ -5,8 +5,9 @@
 #include "plan_container.hpp"
 #include <ros/ros.h>
 #include <memory>
-#include <plan_env/grid_map_new.h>
-#include "simple_dwa.h"
+// #include <plan_env/grid_map_new.h>
+#include <plan_env/grid_map_indoor.h>
+// #include "simple_dwa.h"
 #include <traj_utils/Waypoints.h>
 
 
@@ -43,9 +44,9 @@ namespace fake_planner{
             Eigen::Vector3d getLookaheadTarget(const Eigen::Vector3d& current_pos,
                                                             double lookahead_dist);
 
-            DWAController::Velocity getDWAcmd(const std::vector<double>& pose, 
-                                                double v_c, double w_c,
-                                                double dynamic_safe_radius);
+            // DWAController::Velocity getDWAcmd(const std::vector<double>& pose, 
+            //                                     double v_c, double w_c,
+            //                                     double dynamic_safe_radius);
             
             bool checkCollision(int drone_id);
 
@@ -65,7 +66,7 @@ namespace fake_planner{
 
         private:
             PathPlannerSim3D::Ptr path_optimizer_rebound_;
-            DWAController::Ptr dwa_controller_;
+            // DWAController::Ptr dwa_controller_;
 
 
             std::vector<Eigen::Vector3d> global_path_points_;

@@ -53,8 +53,10 @@ link_directories(${PCL_LIBRARY_DIRS})
 #     ${PCL_LIBRARIES}
 # )
 
+
 add_library( plan_env 
-    src/grid_map.cpp 
+    # src/grid_map.cpp 
+    src/grid_map_indoor.cpp
     src/raycast.cpp
     src/value_map2d.cpp
     )
