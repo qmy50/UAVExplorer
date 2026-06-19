@@ -36,6 +36,11 @@ roslaunch minco_curve explore.launch
 ```
 
 ## 三. Reference：
-[1]. 规划器整体结构及动态环境更新，a*搜索等模块参考/使用 ego planner 链接为：https://github.com/ZJU-FAST-Lab/ego-planner
+[1]. VLN部分价值地图VLM,LLM部分参考ApexNav,链接为: https://github.com/Robotics-STAR-Lab/ApexNav
 
-on progress😎
+[2]. 自主探索框架参考CERLAB-UAV-Autonomy,链接为: https://github.com/Zhefan-Xu/CERLAB-UAV-Autonomy
+
+[3]. 规划器整体结构及动态环境更新，a*搜索等模块参考/使用 ego planner 链接为：https://github.com/ZJU-FAST-Lab/ego-planner
+
+[4]. PX4仿真部分使用XTdroen，链接为： https://gitee.com/robin_shaun/XTDrone
+
