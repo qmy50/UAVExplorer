@@ -14,6 +14,7 @@
 #include <traj_utils/PolyTraj.h>
 // #include <plan_env/grid_map_new.h>
 #include <plan_env/grid_map_indoor.h>
+#include <plan_env/object_map_manager.h>
 #include <actionlib/client/simple_action_client.h>
 #include "minco_curve/RotateDroneAction.h"
 
@@ -84,7 +85,7 @@ private:
   ros::Timer exec_timer_, dep_timer_;
   ros::Subscriber odom_sub_, waypoint_sub_, trigger_sub_, mandatory_stop_sub_,plan_sub_;
   ros::Subscriber clicked_point_sub_;
-  ros::Publisher poly_traj_pub_,waypoint_pub_,cluster_target_marker_pub_;
+  ros::Publisher poly_traj_pub_,waypoint_pub_,cluster_target_marker_pub_,object_cloud_viz_pub_;
 
   void execFSMCallback(const ros::TimerEvent &e);
   void execDepCallback(const ros::TimerEvent &e);
@@ -123,6 +124,11 @@ private:
   double dep_plan_interval_;
   bool dep_has_new_path_;
   double interstep_dist_;  // interpolation distance between waypoints
+
+  // object mapping — multi-frame semantic object fusion
+  std::shared_ptr<ObjectMapManager> object_manager_;
+  void setWaypointsFromObjectCloud(
+      const pcl::PointCloud<pcl::PointXYZ>::Ptr& object_cloud);
 
   // early replan based on path progress
   double path_progress_thresh_;   // progress threshold (0.0~1.0) to trigger early replan, default 0.5

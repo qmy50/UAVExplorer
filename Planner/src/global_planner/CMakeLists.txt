@@ -14,7 +14,6 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   plan_env
-  onboard_detector
 )
 find_package(OpenCV REQUIRED)
 find_package(PCL REQUIRED)
@@ -127,7 +126,6 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
   ${PCL_INCLUDE_DIRS}
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../onboard_detector/include
 )
 
 ## Declare a C++ library

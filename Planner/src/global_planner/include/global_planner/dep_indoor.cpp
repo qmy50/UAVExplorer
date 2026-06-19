@@ -329,7 +329,7 @@ namespace globalPlanner{
 			cout << this->hint_ << ": Use value map: " << this->useValueMap_ << endl;
 		}
 		if (not this->nh_.getParam(this->ns_ + "/semantic_weight", this->semanticWeight_)){
-			this->semanticWeight_ = 50.0;
+			this->semanticWeight_ = 4000.0;
 			cout << this->hint_ << ": No semantic_weight param. Use default: 1.0" << endl;
 		}
 		else{

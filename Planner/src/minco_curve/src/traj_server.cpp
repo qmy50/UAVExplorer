@@ -36,6 +36,7 @@ double max_vel_,max_acc_;
 double pos_jump_thresh_;
 double current_yaw_ = 0.0f;
 Eigen::Vector3d odom_pos_(0, 0, 0);  // for heartbeat hover fallback
+bool have_odom_ = false;            // guard: don't hover at (0,0,0) before first odom
 
 
 // yaw control
@@ -182,179 +183,117 @@ void normalizeYaw(double& yaw) {
 
 void cmdCallback(const ros::TimerEvent &e)
 {
-  /* ━━━ 心跳悬停：无轨迹、无旋转时保持在当前位置 ━━━
-     始终发布悬停指令，防止 PX4 offboard 超时降落 */
-  if (!receive_traj_ && !rotation_ing_) {
-    ros::Time time_now = ros::Time::now();
-    cmd.header.stamp = time_now;
-    cmd.header.frame_id = "world";
-    cmd.trajectory_flag = quadrotor_msgs::PositionCommand::TRAJECTORY_STATUS_READY;
-    cmd.trajectory_id = traj_id_;
-    // 优先用上次指令位置，没有则用 odom 当前位置
-    // Eigen::Vector3d hover_pos = have_last_cmd_pos_ ? last_cmd_pos_ : odom_pos_;
-    Eigen::Vector3d hover_pos = odom_pos_;
-    cmd.position.x = hover_pos(0);
-    cmd.position.y = hover_pos(1);
-    cmd.position.z = hover_pos(2);
-    cmd.velocity.x = 0;
-    cmd.velocity.y = 0;
-    cmd.velocity.z = 0;
-    cmd.acceleration.x = 0;
-    cmd.acceleration.y = 0;
-    cmd.acceleration.z = 0;
-    cmd.yaw = last_yaw_;
-    cmd.yaw_dot = 0;
-    pose_cmd_pub.publish(cmd);
-    have_last_cmd_pos_ = true;  // 确保下次也是 true
-    last_cmd_pos_ = hover_pos;
-    return;
-  }
+  /* ━━━ 全程发送指令：旋转 > 轨迹 > 悬停，永不空转 ━━━ */
+  if (!have_odom_) return;  // 第一条里程计到达前不发指令
 
   ros::Time time_now = ros::Time::now();
-  double t_cur = (time_now - start_time_).toSec();
-
-  Eigen::Vector3d pos(Eigen::Vector3d::Zero()), vel(Eigen::Vector3d::Zero()), acc(Eigen::Vector3d::Zero()), pos_f;
-  std::pair<double, double> yaw_yawdot(0, 0);
-
+  Eigen::Vector3d pos, vel, acc;
+  double yaw = last_yaw_, yaw_dot = 0;
   static ros::Time time_last = ros::Time::now();
-  if(rotation_ing_){
-    double dt = (ros::Time::now()-rotation_start_time_).toSec();
-    double delta_yaw = (rotation_speed_-0.2) * dt;
 
-    // odom yaw 实际转了多少（处理 ±π 跨象限）
+  // ====== Priority 1: 旋转 ======
+  if (rotation_ing_) {
+    double dt = (time_now - rotation_start_time_).toSec();
+    double delta_yaw = (rotation_speed_ - 0.2) * dt;
+
     double odom_delta = current_yaw_ - rotation_start_yaw_;
     while (odom_delta > M_PI)  odom_delta -= 2 * M_PI;
     while (odom_delta < -M_PI) odom_delta += 2 * M_PI;
     if ((rotation_speed_ < 0 && odom_delta > 0) || (rotation_speed_ > 0 && odom_delta < 0))
-        odom_delta = -odom_delta;  // 保证方向一致
+      odom_delta = -odom_delta;
 
-    bool time_done = fabs(delta_yaw) >= fabs(rotation_total_yaw_);
-    bool odom_done = odom_delta >= fabs(rotation_total_yaw_) ;
-
-    if (odom_done) {
-        rotation_ing_ = false;
-        last_yaw_ = rotation_target_yaw_;
-        last_yawdot_ = 0.0;
-        yaw_yawdot = {rotation_target_yaw_, 0.0};
-        ROS_INFO("Rotation done. yaw=%.2f (t=%.2fs o=%.1f° s=%.1f°)",
-                 rotation_target_yaw_, dt,
-                 odom_delta * 180.0 / M_PI, delta_yaw * 180.0 / M_PI);
-
-        // setSucceeded handled by rotateActionGoalCB (blocking execute callback)
+    if (odom_delta >= fabs(rotation_total_yaw_)) {
+      rotation_ing_ = false;
+      last_yaw_ = rotation_target_yaw_;
+      last_yawdot_ = 0.0;
+      yaw = rotation_target_yaw_;
+      ROS_INFO("Rotation done. yaw=%.2f", rotation_target_yaw_);
     } else {
-        double target_yaw = rotation_start_yaw_ + delta_yaw;
-        pos = hover_position_;
-        vel.setZero();
-        acc.setZero();
-        yaw_yawdot = {target_yaw, rotation_speed_};
-
-        // feedback handled by action server
+      yaw = rotation_start_yaw_ + delta_yaw;
+      yaw_dot = rotation_speed_;
     }
-  }else{
-    if (t_cur < traj_duration_ && t_cur >= 0.0)
-    {
+    pos = hover_position_;
+    vel.setZero();
+    acc.setZero();
+  }
+  // ====== Priority 2: 轨迹 ======
+  else if (receive_traj_) {
+    double t_cur = (time_now - start_time_).toSec();
+    if (t_cur >= 0.0 && t_cur < traj_duration_) {
       pos = traj_->getPos(t_cur);
       vel = traj_->getVel(t_cur);
       acc = traj_->getAcc(t_cur);
 
-      if(vel.norm() > max_vel_){
-        vel = max_vel_ * vel.normalized();
-      }
+      if (vel.norm() > max_vel_)  vel = max_vel_ * vel.normalized();
+      if (acc.norm() > max_acc_)  acc = max_acc_ * acc.normalized();
 
-          if(acc.norm() > max_acc_){
-        acc = max_acc_ * acc.normalized();
-      }
-
-      /*** calculate yaw ***/
-      // ROS_WARN("Caculate the yaw angle");
-      yaw_yawdot = calculate_yaw(t_cur, pos, (time_now-time_last).toSec());
-      /*** calculate yaw ***/
-
-      double tf = std::min(traj_duration_, t_cur + 2.0);
-      pos_f = traj_->getPos(tf);
-    }
-    else if (t_cur >= traj_duration_)
-    {
-      /* hover when finish traj_ */
+      std::pair<double, double> yy = calculate_yaw(t_cur, pos, (time_now - time_last).toSec());
+      yaw = yy.first;
+      yaw_dot = yy.second;
+    } else {
+      // 轨迹结束后悬停在末端
       pos = traj_->getPos(traj_duration_);
       vel.setZero();
       acc.setZero();
-
-      yaw_yawdot.first = last_yaw_;
-      yaw_yawdot.second = 0;
-
-      pos_f = pos;
     }
   }
-  // else
-  // {
-  //   cout << "[Traj server]: invalid time." << endl;
-  // }
+  // ====== Priority 3: 悬停 ======
+  else {
+    pos = odom_pos_;
+    vel.setZero();
+    acc.setZero();
+  }
+
   time_last = time_now;
 
-  cmd.header.stamp = time_now;
-  cmd.header.frame_id = "world";
-  cmd.trajectory_flag = quadrotor_msgs::PositionCommand::TRAJECTORY_STATUS_READY;
-  cmd.trajectory_id = traj_id_;
-
+  // ━━━ 统一下发指令（保证每次都发） ━━━
+  cmd.header.stamp    = time_now;
+  cmd.header.frame_id  = "world";
+  cmd.trajectory_flag  = quadrotor_msgs::PositionCommand::TRAJECTORY_STATUS_READY;
+  cmd.trajectory_id    = traj_id_;
   cmd.position.x = pos(0);
   cmd.position.y = pos(1);
   cmd.position.z = pos(2);
-
   cmd.velocity.x = vel(0);
   cmd.velocity.y = vel(1);
   cmd.velocity.z = vel(2);
-
   cmd.acceleration.x = acc(0);
   cmd.acceleration.y = acc(1);
   cmd.acceleration.z = acc(2);
+  cmd.yaw     = yaw;
+  cmd.yaw_dot = yaw_dot;
 
-  cmd.yaw = yaw_yawdot.first;
-  cmd.yaw_dot = yaw_yawdot.second;
-
-  last_yaw_ = cmd.yaw;
-
-  // Track last commanded position for continuity check
+  last_yaw_ = yaw;
   last_cmd_pos_ = pos;
   have_last_cmd_pos_ = true;
 
   pos_cmd_pub.publish(cmd);
 
+  // 同时发布 pose_cmd 给 PX4
   pose_cmd.position.x = pos(0);
   pose_cmd.position.y = pos(1);
   pose_cmd.position.z = pos(2);
-
-  pose_cmd.orientation.x = 0.0; 
+  pose_cmd.orientation.x = 0.0;
   pose_cmd.orientation.y = 0.0;
-  pose_cmd.orientation.z = sin(yaw_yawdot.first/2);
-  pose_cmd.orientation.w = cos(yaw_yawdot.first/2);
+  pose_cmd.orientation.z = sin(yaw / 2);
+  pose_cmd.orientation.w = cos(yaw / 2);
 
-  if (g_nh){
+  if (g_nh) {
     bool publish_pose_cmd = false;
-    g_nh->param<bool>("/publish_pose_cmd",publish_pose_cmd,true);
-    if (publish_pose_cmd){
-        pose_cmd_pub.publish(pose_cmd);
-      }
+    g_nh->param<bool>("/publish_pose_cmd", publish_pose_cmd, true);
+    if (publish_pose_cmd) pose_cmd_pub.publish(pose_cmd);
   }
+
+  // 机体坐标系速度指令（可选）
   if (publish_cmd_vel) {
     geometry_msgs::Twist vel_cmd;
-
-    double yaw = current_yaw_;
-    double cos_yaw = cos(yaw);
-    double sin_yaw = sin(yaw);
-    double v_body_x =  vel(0) * cos_yaw + vel(1) * sin_yaw;
-    double v_body_y = -vel(0) * sin_yaw + vel(1) * cos_yaw;
-    double v_body_z =  vel(2);
-
-    vel_cmd.linear.x = v_body_x;
-    vel_cmd.linear.y = v_body_y;
-    vel_cmd.linear.z = v_body_z;
-    //vel_cmd.angular.z = yaw_yawdot.second;  
-
+    double cos_yaw = cos(current_yaw_);
+    double sin_yaw = sin(current_yaw_);
+    vel_cmd.linear.x =  vel(0) * cos_yaw + vel(1) * sin_yaw;
+    vel_cmd.linear.y = -vel(0) * sin_yaw + vel(1) * cos_yaw;
+    vel_cmd.linear.z =  vel(2);
     cmd_vel_pub_.publish(vel_cmd);
-    // ROS_WARN_THROTTLE(1.0, "Send vel command (body frame)");
   }
-
 }
 
 
@@ -364,6 +303,7 @@ void odometryCallback(const nav_msgs::OdometryConstPtr &msg)
                    msg->pose.pose.orientation.z,msg->pose.pose.orientation.w);
   current_yaw_ = tf::getYaw(q);
   odom_pos_ << msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z;
+  have_odom_ = true;
 }
 
 bool handleRotate(minco_curve::RotateDrone::Request& req,minco_curve::RotateDrone::Response& res){

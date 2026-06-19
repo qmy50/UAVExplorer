@@ -270,8 +270,13 @@ void GridMap::initMap(ros::NodeHandle &nh)
   node_.param("grid_map/local_map_margin", mp_.local_map_margin_, 1);
   node_.param("grid_map/ground_height", mp_.ground_height_, 1.0);
 
+  // map_origin: default centers map at world (0,0); override to shift the map
+  double origin_x, origin_y;
+  node_.param("grid_map/map_origin_x", origin_x, -x_size / 2.0);
+  node_.param("grid_map/map_origin_y", origin_y, -y_size / 2.0);
+
   mp_.resolution_inv_ = 1 / mp_.resolution_;
-  mp_.map_origin_ = Eigen::Vector3d(-x_size / 2.0, -y_size / 2.0, mp_.ground_height_);
+  mp_.map_origin_ = Eigen::Vector3d(origin_x, origin_y, mp_.ground_height_);
   mp_.map_size_ = Eigen::Vector3d(x_size, y_size, z_size);
 
   mp_.prob_hit_log_ = logit(mp_.p_hit_);

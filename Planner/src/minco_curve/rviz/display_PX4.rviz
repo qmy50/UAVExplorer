@@ -9,7 +9,9 @@ Panels:
         - /Map1
         - /UAV_0_opt_traj1
         - /MarkerArray1
-        - /Map2
+        - /PointCloud23
+        - /Odometry1
+        - /Marker1
       Splitter Ratio: 0.5
     Tree Height: 839
   - Class: rviz/Selection
@@ -63,7 +65,7 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 2.065000057220459
+        Max Value: 1.1649999618530273
         Min Value: 0.9649999737739563
         Value: true
       Axis: Z
@@ -159,7 +161,7 @@ Visualization Manager:
       Marker Topic: /drone_0_fake_explorer_node/opt_traj
       Name: UAV_0_opt_traj
       Namespaces:
-        minco_opt: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -167,22 +169,80 @@ Visualization Manager:
       Marker Topic: /dep/roadmap
       Name: MarkerArray
       Namespaces:
-        edge: true
-        goal_candidate: true
-        num_voxel_text: true
-        prm_point: true
+        {}
       Queue Size: 100
       Value: true
-    - Alpha: 0.699999988079071
-      Class: rviz/Map
-      Color Scheme: map
-      Draw Behind: false
-      Enabled: false
-      Name: Map
-      Topic: /dep/value_map
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: RGB8
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Min Color: 0; 0; 0
+      Name: PointCloud2
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.10000000149011612
+      Style: Flat Squares
+      Topic: /object/clouds
       Unreliable: false
-      Use Timestamp: false
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
+    - Angle Tolerance: 0.10000000149011612
+      Class: rviz/Odometry
+      Covariance:
+        Orientation:
+          Alpha: 0.5
+          Color: 255; 255; 127
+          Color Style: Unique
+          Frame: Local
+          Offset: 1
+          Scale: 1
+          Value: true
+        Position:
+          Alpha: 0.30000001192092896
+          Color: 204; 51; 204
+          Scale: 1
+          Value: true
+        Value: false
+      Enabled: false
+      Keep: 1
+      Name: Odometry
+      Position Tolerance: 0.10000000149011612
+      Queue Size: 10
+      Shape:
+        Alpha: 1
+        Axes Length: 1
+        Axes Radius: 0.10000000149011612
+        Color: 255; 25; 0
+        Head Length: 0.30000001192092896
+        Head Radius: 0.10000000149011612
+        Shaft Length: 1
+        Shaft Radius: 0.05000000074505806
+        Value: Arrow
+      Topic: /iris_0/mavros/odometry/in
+      Unreliable: false
       Value: false
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /drone_0_fake_explorer_node/object_cloud_viz
+      Name: Marker
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 243; 236; 166
@@ -207,7 +267,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 15.06522274017334
+      Distance: 12.223755836486816
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -215,17 +275,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: -0.5427314639091492
-        Y: 0.49299871921539307
-        Z: 0.18736624717712402
+        X: -0.7689107060432434
+        Y: 1.6474562883377075
+        Z: -0.7486156225204468
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.569795846939087
+      Pitch: 0.7197970151901245
       Target Frame: <Fixed Frame>
-      Yaw: 0.0087127685546875
+      Yaw: 4.170093059539795
     Saved: ~
 Window Geometry:
   Displays:

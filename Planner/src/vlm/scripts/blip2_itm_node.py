@@ -125,4 +125,4 @@ if __name__ == "__main__":
     except rospy.ROSInterruptException:
         pass
 
-# python blip2itm.py
+# python blip2_itm_node.py

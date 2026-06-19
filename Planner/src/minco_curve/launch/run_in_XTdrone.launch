@@ -2,6 +2,7 @@
   <!-- size of map, change the size inflate x, y, z according to your application -->
   <!-- <arg name="map_size_x" value="40.0"/> -->
   <!-- <arg name="map_size_y" value="15.0"/> -->
+    <!-- <arg name="map_size_x" value="15.5"/> -->
     <arg name="map_size_x" value="15.5"/>
   <arg name="map_size_y" value="7.3"/>
   <arg name="map_size_z" value=" 4.0"/>
@@ -68,7 +69,7 @@
         <param name="color/g" value="0.0"/>        
         <param name="color/b" value="0.0"/>       
         <param name="covariance_scale" value="100.0"/>       
-        <param name="robot_scale" value="1.0"/>
+        <param name="robot_scale" value="0.5"/>
         <param name="tf45" value="true"/>
   </node>
 

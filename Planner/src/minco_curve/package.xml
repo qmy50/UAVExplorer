@@ -18,7 +18,7 @@
     <exec_depend>tf</exec_depend>
   <depend>plan_env</depend>
   <depend>path_searching</depend>
-  <depend>onboard_detector</depend>
+
   <depend>global_planner</depend>
   <depend>message_generation</depend>
   <depend>actionlib</depend>

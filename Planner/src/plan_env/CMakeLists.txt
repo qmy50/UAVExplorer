@@ -17,11 +17,25 @@ find_package(catkin REQUIRED COMPONENTS
   visualization_msgs
   cv_bridge
   message_filters
-  onboard_detector
+  pcl_ros
+  message_generation
+  sensor_msgs
 )
 
 find_package(Eigen3 REQUIRED)
 find_package(PCL 1.7 REQUIRED)
+
+add_message_files(
+  FILES
+  SingleMasksWithConfidence.msg
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+  sensor_msgs
+)
+
 
 catkin_package(
  INCLUDE_DIRS include
@@ -54,13 +68,16 @@ link_directories(${PCL_LIBRARY_DIRS})
 # )
 
 
-add_library( plan_env 
-    # src/grid_map.cpp 
+add_library( plan_env
+    # src/grid_map.cpp
     src/grid_map_indoor.cpp
     src/raycast.cpp
     src/value_map2d.cpp
+    src/object_map2d.cpp
+    src/object_map_manager.cpp
     )
+add_dependencies(plan_env ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries( plan_env
-    ${catkin_LIBRARIES} 
+    ${catkin_LIBRARIES}
     ${PCL_LIBRARIES}
     )  

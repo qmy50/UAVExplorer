@@ -72,6 +72,14 @@
     <param name="grid_map/local_map_margin" value="10"/>
     <param name="grid_map/ground_height"        value="-0.01"/>
 
+    <!-- map origin: defaults to (-map_size_x/2, -map_size_y/2) → center at (0,0) -->
+    <!-- uncomment to shift map center, e.g. map_origin_x=-5 map_origin_y=-5 → center at (1.5, 0) -->
+    <!-- <param name="grid_map/map_origin_x"    value="-13.0"/>
+    <param name="grid_map/map_origin_y"    value="-2.0"/> -->
+
+        <param name="grid_map/map_origin_x"    value="-9.25"/>
+    <param name="grid_map/map_origin_y"    value="-3.65"/>
+
         <param name="grid_map/height_range_min" value="1.0"/>
     <param name="grid_map/height_range_max" value="2.0"/>
 

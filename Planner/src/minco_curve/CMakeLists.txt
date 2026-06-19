@@ -16,7 +16,6 @@ find_package(catkin REQUIRED COMPONENTS
     tf2_ros
     plan_env
     path_searching
-    onboard_detector
     global_planner
     actionlib
     actionlib_msgs

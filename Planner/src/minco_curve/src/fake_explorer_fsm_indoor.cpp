@@ -44,12 +44,13 @@ void FakeExploreFSM::init(ros::NodeHandle &nh)
 
     odom_sub_ = node_.subscribe("odom_world", 10, &FakeExploreFSM::odometryCallback, this);
 
-    clicked_point_sub_ = node_.subscribe("/cluster_target", 1, &FakeExploreFSM::clusterTargetCallback, this);
+    // clicked_point_sub_ = node_.subscribe("/cluster_target", 1, &FakeExploreFSM::clusterTargetCallback, this);
 
     // trigger_sub_ = node_.subscribe("trigger", 1, &FakeExploreFSM::triggerCallback, this);
     poly_traj_pub_ = node_.advertise<traj_utils::PolyTraj>("planning/trajectory", 10);
     waypoint_pub_ = node_.advertise<visualization_msgs::Marker>("minco_waypoints", 10);
     cluster_target_marker_pub_ = node_.advertise<visualization_msgs::Marker>("cluster_target_marker", 10);
+    object_cloud_viz_pub_ = node_.advertise<visualization_msgs::Marker>("object_cloud_viz", 10);
       
     ROS_INFO("FSM initialized, waiting for odom and target.");
     nh.param("fsm/predict_dt", predict_dt_, 0.01);      
@@ -64,6 +65,10 @@ void FakeExploreFSM::init(ros::NodeHandle &nh)
     node_.param("fsm/dep_plan_interval", dep_plan_interval_, 2.0);  // DEP replan interval (seconds)
     node_.param("fsm/interstep_dist", interstep_dist_, 0.1);       // interpolation distance between waypoints
     dep_has_new_path_ = false;
+
+    // object mapping — replaces /cluster_target with multi-frame fused objects
+    object_manager_.reset(new ObjectMapManager(planner_manager_->grid_map_, nh));
+    object_manager_->init();
 
     // early replan based on path progress
     node_.param("fsm/path_progress_thresh", path_progress_thresh_, 0.5);  // progress threshold (0.0~1.0) to allow early replan, default 50%
@@ -107,7 +112,7 @@ void FakeExploreFSM::init(ros::NodeHandle &nh)
     change_layer_test_ = false;
     drop_goal_test_ = false;
 
-    ros::Duration(2.0).sleep(); // wait for maps's preperation
+    ros::Duration(0.5).sleep(); // wait for maps's preperation
 
     exec_timer_ = node_.createTimer(ros::Duration(0.02), &FakeExploreFSM::execFSMCallback, this);
     dep_timer_ = node_.createTimer(ros::Duration(0.02),&FakeExploreFSM::execDepCallback, this);
@@ -180,6 +185,54 @@ void FakeExploreFSM::execDepCallback(const ros::TimerEvent &e){
             // ROS_WARN_THROTTLE(1.0,"On our way to current traj,plan latter");
             return;
         }
+
+        // === Priority: high-confidence semantic objects (multi-frame fused) ===
+        // Only check when not already executing a cluster/object target
+        if (!executing_cluster_target_ && object_manager_) {
+          Eigen::Vector3d object_target;
+          if (object_manager_->getBestObjectTarget(object_target, odom_pos_)) {
+            ROS_WARN("[ExploreFSM] ObjectMap2D: AABB target (%.2f, %.2f, %.2f) → GOTOCLUSTER",
+                     object_target.x(), object_target.y(), object_target.z());
+
+            // Visualize target marker
+            {
+              visualization_msgs::Marker target_marker;
+              target_marker.header.frame_id = "map";
+              target_marker.header.stamp = ros::Time::now();
+              target_marker.ns = "cluster_target";
+              target_marker.id = 0;
+              target_marker.type = visualization_msgs::Marker::SPHERE;
+              target_marker.action = visualization_msgs::Marker::ADD;
+              target_marker.pose.position.x = object_target.x();
+              target_marker.pose.position.y = object_target.y();
+              target_marker.pose.position.z = object_target.z();
+              target_marker.pose.orientation.w = 1.0;
+              target_marker.scale.x = target_marker.scale.y = target_marker.scale.z = 0.3;
+              target_marker.color.r = 1.0;
+              target_marker.color.g = 0.0;
+              target_marker.color.b = 0.0;
+              target_marker.color.a = 1.0;
+              target_marker.lifetime = ros::Duration(1.0);
+              cluster_target_marker_pub_.publish(target_marker);
+            }
+
+            waypoint_list_.clear();
+            waypoint_list_.push_back(object_target);
+            current_wp_idx_ = 0;
+            dep_has_new_path_ = true;
+            trigger_ = true;
+            have_traj_ = false;
+            touch_goal_ = false;
+            initial_dist_to_goal_ = (odom_pos_ - object_target).norm();
+            early_replan_requested_ = false;
+
+            executing_cluster_target_ = true;
+            cluster_path_ready_ = false;
+            changeFSMExecState(GOTOCLUSTER, "ObjectMap2D → GOTOCLUSTER");
+            return;
+          }
+        }
+
         bool replanSuccess = expPlanner_->makePlan();
         last_dep_plan_time_ = now;
         if (replanSuccess) {
@@ -247,7 +300,7 @@ void FakeExploreFSM::execDepCallback(const ros::TimerEvent &e){
 void FakeExploreFSM::execFSMCallback(const ros::TimerEvent &e)
 {
     if(task_complete_){
-      ROS_INFO("✅ TASK COMPLETE !!!");
+      ROS_INFO_THROTTLE(1.0,"✅ TASK COMPLETE !!!");
       return;
     }
     if (exec_state_ == EMERGENCY_STOP)
@@ -402,13 +455,13 @@ void FakeExploreFSM::execFSMCallback(const ros::TimerEvent &e)
               trigger_ = false;
               have_traj_ = false;
               dep_has_new_path_ = false;
-              // If this was a cluster target, clear the cluster mode and resume exploration
+              // If this was a cluster/object target, clear the mode and resume exploration
               if (executing_cluster_target_) {
                   executing_cluster_target_ = false;
                   has_cluster_target_ = false;
                   cluster_path_ready_ = false;
                   task_complete_ = true;
-                  ROS_INFO("[ExploreFSM] Cluster target reached, finish task");
+                  ROS_INFO("[ExploreFSM] Object target reached, resuming exploration");
               }
               // Request immediate DEP replan for next exploration target
               last_dep_plan_time_ = ros::Time(0);
@@ -661,57 +714,137 @@ bool FakeExploreFSM::gotoClusterPlan()
   }
 }
 
-void FakeExploreFSM::clusterTargetCallback(const geometry_msgs::PoseStampedConstPtr &msg)
+void FakeExploreFSM::setWaypointsFromObjectCloud(
+    const pcl::PointCloud<pcl::PointXYZ>::Ptr& object_cloud)
 {
-  // Ignore new cluster targets if already executing one
-  if (executing_cluster_target_) {
-    ROS_WARN("[ExploreFSM] Already executing a cluster target, ignoring new one");
-    return;
+  if (!object_cloud || object_cloud->points.empty()) return;
+
+  // Find the nearest point in the object point cloud to the drone
+  double min_dist = std::numeric_limits<double>::max();
+  Eigen::Vector3d nearest_pt(0, 0, odom_pos_.z());  // keep current z
+  for (const auto& pt : object_cloud->points) {
+    double d = std::hypot(pt.x - odom_pos_.x(), pt.y - odom_pos_.y());
+    if (d < min_dist) {
+      min_dist = d;
+      nearest_pt = Eigen::Vector3d(pt.x, pt.y, odom_pos_.z());
+    }
   }
 
-  cluster_target_pt_ = Eigen::Vector3d(msg->pose.position.x,
-                                        msg->pose.position.y,
-                                        msg->pose.position.z);
-  ROS_INFO("[ExploreFSM] Cluster target received at (%.2f, %.2f, %.2f), switching to GOTOCLUSTER",
-           cluster_target_pt_.x(), cluster_target_pt_.y(), cluster_target_pt_.z());
+  ROS_INFO("[ExploreFSM] Object target: nearest point (%.2f, %.2f) at dist=%.2fm",
+           nearest_pt.x(), nearest_pt.y(), min_dist);
 
-  // Publish cluster target as a red sphere Marker in RViz
+  // ---- Visualize object cloud candidate points (green SPHERE_LIST) ----
   {
-    visualization_msgs::Marker marker;
-    marker.header.frame_id = "map";
-    marker.header.stamp = ros::Time::now();
-    marker.ns = "cluster_target";
-    marker.id = 0;
-    marker.type = visualization_msgs::Marker::SPHERE;
-    marker.action = visualization_msgs::Marker::ADD;
-    marker.pose.position.x = cluster_target_pt_.x();
-    marker.pose.position.y = cluster_target_pt_.y();
-    marker.pose.position.z = cluster_target_pt_.z();
-    marker.pose.orientation.w = 1.0;
-    marker.scale.x = 0.3;
-    marker.scale.y = 0.3;
-    marker.scale.z = 0.3;
-    marker.color.a = 1.0;
-    marker.color.r = 1.0;
-    marker.color.g = 0.0;
-    marker.color.b = 0.0;
-    marker.lifetime = ros::Duration(0);  // persistent until new target received
-    cluster_target_marker_pub_.publish(marker);
+    visualization_msgs::Marker cloud_marker;
+    cloud_marker.header.frame_id = "map";
+    cloud_marker.header.stamp = ros::Time::now();
+    cloud_marker.ns = "object_cloud_viz";
+    cloud_marker.id = 0;
+    cloud_marker.type = visualization_msgs::Marker::SPHERE_LIST;
+    cloud_marker.action = visualization_msgs::Marker::ADD;
+    cloud_marker.scale.x = cloud_marker.scale.y = cloud_marker.scale.z = 0.1;
+    cloud_marker.color.r = 0.0;
+    cloud_marker.color.g = 1.0;
+    cloud_marker.color.b = 0.0;
+    cloud_marker.color.a = 0.6;
+    cloud_marker.pose.orientation.w = 1.0;
+    cloud_marker.lifetime = ros::Duration(0.5);
+
+    for (const auto& pt : object_cloud->points) {
+      geometry_msgs::Point p;
+      p.x = pt.x;
+      p.y = pt.y;
+      p.z = odom_pos_.z();
+      cloud_marker.points.push_back(p);
+    }
+    object_cloud_viz_pub_.publish(cloud_marker);
   }
 
-  // Set single waypoint and enter cluster mode (DEP exploration fully disabled)
-  waypoint_list_.clear();
-  waypoint_list_.push_back(cluster_target_pt_);
-  current_wp_idx_ = 0;
-  has_cluster_target_ = true;
-  executing_cluster_target_ = true;
-  cluster_path_ready_ = false;
-  have_traj_ = false;
-  dep_has_new_path_ = true;   // block DEP from overwriting waypoint_list_
-  // trigger_ = false;            // don't use DEP exploration trigger
+  // ---- Visualize selected target point (red SPHERE) ----
+  {
+    visualization_msgs::Marker target_marker;
+    target_marker.header.frame_id = "map";
+    target_marker.header.stamp = ros::Time::now();
+    target_marker.ns = "cluster_target";
+    target_marker.id = 0;
+    target_marker.type = visualization_msgs::Marker::SPHERE;
+    target_marker.action = visualization_msgs::Marker::ADD;
+    target_marker.pose.position.x = nearest_pt.x();
+    target_marker.pose.position.y = nearest_pt.y();
+    target_marker.pose.position.z = odom_pos_.z();
+    target_marker.pose.orientation.w = 1.0;
+    target_marker.scale.x = target_marker.scale.y = target_marker.scale.z = 0.3;
+    target_marker.color.r = 1.0;
+    target_marker.color.g = 0.0;
+    target_marker.color.b = 0.0;
+    target_marker.color.a = 1.0;
+    target_marker.lifetime = ros::Duration(0.5);
+    cluster_target_marker_pub_.publish(target_marker);
+  }
 
-  changeFSMExecState(GOTOCLUSTER, "Cluster target received");
+  waypoint_list_.clear();
+  waypoint_list_.push_back(nearest_pt);
+  current_wp_idx_ = 0;
+  dep_has_new_path_ = true;   // block DEP from overwriting
+  trigger_ = true;
+  have_traj_ = false;
+  touch_goal_ = false;
+  initial_dist_to_goal_ = (odom_pos_ - nearest_pt).norm();
+  early_replan_requested_ = false;
+
 }
+
+// void FakeExploreFSM::clusterTargetCallback(const geometry_msgs::PoseStampedConstPtr &msg)
+// {
+//   // Ignore new cluster targets if already executing one
+//   if (executing_cluster_target_) {
+//     ROS_WARN("[ExploreFSM] Already executing a cluster target, ignoring new one");
+//     return;
+//   }
+
+//   cluster_target_pt_ = Eigen::Vector3d(msg->pose.position.x,
+//                                         msg->pose.position.y,
+//                                         msg->pose.position.z);
+//   ROS_INFO("[ExploreFSM] Cluster target received at (%.2f, %.2f, %.2f), switching to GOTOCLUSTER",
+//            cluster_target_pt_.x(), cluster_target_pt_.y(), cluster_target_pt_.z());
+
+//   // Publish cluster target as a red sphere Marker in RViz
+//   {
+//     visualization_msgs::Marker marker;
+//     marker.header.frame_id = "map";
+//     marker.header.stamp = ros::Time::now();
+//     marker.ns = "cluster_target";
+//     marker.id = 0;
+//     marker.type = visualization_msgs::Marker::SPHERE;
+//     marker.action = visualization_msgs::Marker::ADD;
+//     marker.pose.position.x = cluster_target_pt_.x();
+//     marker.pose.position.y = cluster_target_pt_.y();
+//     marker.pose.position.z = cluster_target_pt_.z();
+//     marker.pose.orientation.w = 1.0;
+//     marker.scale.x = 0.3;
+//     marker.scale.y = 0.3;
+//     marker.scale.z = 0.3;
+//     marker.color.a = 1.0;
+//     marker.color.r = 1.0;
+//     marker.color.g = 0.0;
+//     marker.color.b = 0.0;
+//     marker.lifetime = ros::Duration(0);  // persistent until new target received
+//     cluster_target_marker_pub_.publish(marker);
+//   }
+
+//   // Set single waypoint and enter cluster mode (DEP exploration fully disabled)
+//   waypoint_list_.clear();
+//   waypoint_list_.push_back(cluster_target_pt_);
+//   current_wp_idx_ = 0;
+//   has_cluster_target_ = true;
+//   executing_cluster_target_ = true;
+//   cluster_path_ready_ = false;
+//   have_traj_ = false;
+//   dep_has_new_path_ = true;   // block DEP from overwriting waypoint_list_
+//   // trigger_ = false;            // don't use DEP exploration trigger
+
+//   changeFSMExecState(GOTOCLUSTER, "Cluster target received");
+// }
 
 void FakeExploreFSM::odometryCallback(const nav_msgs::OdometryConstPtr &msg)
 {
