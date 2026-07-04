@@ -192,6 +192,28 @@ $$\Sigma_F = \begin{bmatrix} 43.93 & 15.53 \\ 15.53 & 31.13 \end{bmatrix}, \quad
 
 **最优方案**：双特征 + 等先验概率，test1 错误率 2.86%，test2 错误率约 10%。
 
+
+对，完全可以。从数学上看，不相关假设就是完整协方差矩阵的特例——把协方差矩阵的非对角元置零即可。
+     
+  具体来说，如果令：
+     
+  $$\Sigma_i = \begin{bmatrix} \sigma_{i1}^2 & 0 \ 0 & \sigma_{i2}^2 \end{bmatrix}$$
+
+  代入 discriminant_2d_full 的公式：
+
+  $$
+  \Sigma_i^{-1} = \begin{bmatrix} 1/\sigma_{i1}^2 & 0 \ 0 & 1/\sigma_{i2}^2 \end{bmatrix}, \quad
+  \ln|\Sigma_i| = \ln\sigma_{i1}^2 + \ln\sigma_{i2}^2
+  $$
+
+  展开后：
+
+  $$(x-\mu)^T\Sigma^{-1}(x-\mu) = \frac{(x_1-\mu_1)^2}{\sigma_1^2} + \frac{(x_2-\mu_2)^2}{\sigma_2^2}$$
+
+  正是 discriminant_2d_diag 的逐维求和形式，两者数学上完全等价。
+
+  那为什么还要分开写？纯属教学目的：
+
 ---
 
 ## 六、体会与总结
