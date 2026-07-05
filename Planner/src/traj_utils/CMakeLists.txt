@@ -33,7 +33,7 @@ generate_messages(
 )
 
 catkin_package(
- LIBRARIES traj_utils 
+#  LIBRARIES traj_utils 
  CATKIN_DEPENDS message_runtime
 #  DEPENDS system_lib
 )

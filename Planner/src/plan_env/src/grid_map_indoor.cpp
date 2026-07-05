@@ -1,7 +1,9 @@
 #include "plan_env/grid_map_indoor.h"
 #include <cv_bridge/cv_bridge.h>
-#include <opencv2/imgproc.hpp> 
-#include <opencv2/core.hpp> 
+#include <opencv2/imgproc.hpp>
+#include <opencv2/core.hpp>
+#include <queue>
+#include <algorithm> 
 
 struct MappingData 
 {
@@ -49,6 +51,7 @@ struct MappingData
 
   double fuse_time_, max_fuse_time_;
   int update_num_;
+  int raycast_cnt_;
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
@@ -320,6 +323,7 @@ void GridMap::initMap(ros::NodeHandle &nh)
   md_->flag_traverse_ = vector<char>(buffer_size, -1);
 
   md_->raycast_num_ = 0;
+  md_->raycast_cnt_ = 0;
 
   md_->proj_points_.resize(640 * 480 / mp_.skip_pixel_ / mp_.skip_pixel_ * 2);
   md_->proj_points_cnt = 0;
@@ -400,7 +404,7 @@ void GridMap::publish2DOccupancyGrid(){
 
 		int width  = mp_.map_voxel_num_(0);
 		int height = mp_.map_voxel_num_(1);
-		// double z = 1.5f;
+		// double z = 0.45f;
     double z = current_z_;
 		int zIdx   =  floor((z - mp_.map_origin_(2)) * mp_.resolution_inv_);
 
@@ -455,32 +459,72 @@ void GridMap::publish2DOccupancyGrid(){
 				update_max(1) = min(update_max(1), height - 1);
 
 				// 直接使用 occupancy_buffer_ 在 z 切片上的数据：
-				// - occupancy_buffer_inflate_ > 0 → 占据(100/黑)
-				// - occupancy_buffer_ 已知且非占据 → 自由(0/白)
-				// - occupancy_buffer_ 未知 → 保持原值(-1/灰)
-				// 3D缓冲区已经通过 raycast 标记了视野锥内的自由空间，无需额外射线追踪
-					for (int x = update_min(0); x <= update_max(0); ++x) {
-						for (int y = update_min(1); y <= update_max(1); ++y) {
-								Eigen::Vector3i pointIdx(x, y, zIdx);
-								int map2DIdx = x + y * width;
-								int addr = toAddress(pointIdx);
+				// - occupancy_buffer_ > min_occupancy_log_ → 占据(100/黑)
+				// - 3D 已知且非占据 → 自由(0/白)
+				// - 未知 → 保持原值(-1/灰)
 
+				// Habitat 模式: 0.5/0.6 两层 OR 逻辑
+				//   - 任意层占据 → 2D 占据
+				//   - 任意层已知且非占据 → 2D free (不再要求所有层都 free)
+				bool habitat_mode = false;
+				ros::param::param("/use_habitat_mode", habitat_mode, false);
+				std::vector<double> z_layers;
+        std::vector<double> z_obstacle_layers;
+				// if (habitat_mode){
+					z_layers = {0.5};
+          z_obstacle_layers = {0.2, 0.5};
+        // }
+				// else{
+				// 	z_layers = {0.5};
+        // }
 
-								if (md_->occupancy_buffer_[addr] > mp_.min_occupancy_log_ || occupancy_2d_persistent_[map2DIdx] == 100 ) {
-										// 占据（黑色）
-										occupancy_2d_persistent_[map2DIdx] = 100;
-                    //ROS_WARN("Update 2d map to occupancy");
-								} else if (!isUnknown(pointIdx)) {
-										// 自由（白色）：3D缓冲区已知且非占据
-										occupancy_2d_persistent_[map2DIdx] = 0;
-                    //ROS_WARN("Update 2d map to free");
-                    
+				for (int x = update_min(0); x <= update_max(0); ++x) {
+					for (int y = update_min(1); y <= update_max(1); ++y) {
+						int map2DIdx = x + y * width;
+						bool any_occ = false, any_known_free = false;
+
+						for (double z_layer : z_layers) {
+							int zi = floor((z_layer - mp_.map_origin_(2)) * mp_.resolution_inv_);
+							Eigen::Vector3i pt(x, y, zi);
+							int addr = toAddress(pt);
+							// Habitat 模式用 inflate buffer（膨胀障碍更保守），否则用原始 buffer
+							if (habitat_mode) {
+								// if (md_->occupancy_buffer_inflate_[addr] > 0)
+								// 	any_occ = true;
+								if (!any_known_free) {
+									// 已知（>= clamp_min_log）且非占据 → free
+									if (md_->occupancy_buffer_[addr] >= mp_.clamp_min_log_ - 1e-3
+									    && md_->occupancy_buffer_inflate_[addr] == 0)
+										any_known_free = true;
 								}
-								// 未知区域保持原值，不回退为-1（保留历史探索结果）
+							}else {
+								if (md_->occupancy_buffer_[addr] > mp_.min_occupancy_log_)
+									any_occ = true;
+								if (!any_known_free && !isUnknown(pt)
+								    && md_->occupancy_buffer_[addr] <= mp_.min_occupancy_log_)
+									any_known_free = true;
+							}
 						}
+
+            for (double z_layer : z_obstacle_layers) {
+              int zi = floor((z_layer - mp_.map_origin_(2)) * mp_.resolution_inv_);
+              Eigen::Vector3i pt(x, y, zi);
+              int addr = toAddress(pt);
+              if(habitat_mode){
+                if (md_->occupancy_buffer_inflate_[addr] > 0)
+									any_occ = true;
+              }
+            }
+
+						if (any_occ || occupancy_2d_persistent_[map2DIdx] == 100) {
+							occupancy_2d_persistent_[map2DIdx] = 100;
+						} else if (any_known_free) {
+							occupancy_2d_persistent_[map2DIdx] = 0;
+						}
+					}
 				}
 
-				// 更新地图范围缓存
+				// 更新地图范围缓存（用主 z 层）
 				for (int x = update_min(0); x <= update_max(0); ++x) {
 						for (int y = update_min(1); y <= update_max(1); ++y) {
 								Eigen::Vector3i pointIdx(x, y, zIdx);
@@ -624,6 +668,22 @@ bool GridMap::is2DInflatedOccupiedLine2D(const Eigen::Vector3d& p1, const Eigen:
 	return false;
 }
 
+// 强制设置2D占据（脱困失败时标记障碍，使DEP规划绕开该位置）
+void GridMap::setForceOcc2D(double x, double y) {
+  if (!has_2d_map_initialized_) return;
+
+  int ix = static_cast<int>((x - map_2d_origin_x_) * map_2d_res_inv_);
+  int iy = static_cast<int>((y - map_2d_origin_y_) * map_2d_res_inv_);
+  if (ix < 0 || ix >= map_2d_width_ || iy < 0 || iy >= map_2d_height_) return;
+
+  int idx = iy * map_2d_width_ + ix;
+  {
+    std::lock_guard<std::mutex> lock(map_2d_mutex_);
+    occupancy_2d_persistent_[idx] = 100;  // 占据
+    cached_2d_map_.data[idx] = 100;
+  }
+}
+
 // ---------------------------------------------------------------------------------------
 
 void GridMap::resetBuffer()
@@ -710,17 +770,8 @@ void GridMap::projectDepthImage()
 
         Eigen::Vector3d proj_pt;
         depth = (*row_ptr++) / mp_.k_depth_scaling_factor_;
-        if (depth == 0.0)  // 无有效深度
-        {
-            // 生成一条最大长度的 free 射线
-            depth = mp_.max_ray_length_+0.1;
-            proj_pt(0) = (u - mp_.cx_) * depth / mp_.fx_;
-            proj_pt(1) = (v - mp_.cy_) * depth / mp_.fy_;
-            proj_pt(2) = depth;
-            proj_pt = camera_r * proj_pt + md_->camera_pos_;
-            md_->proj_points_[md_->proj_points_cnt++] = proj_pt;
+        if (depth == 0.0)  // 无有效深度：跳过，不生成 free 射线（避免地图外区域误标 free）
             continue;
-        }
         proj_pt(0) = (u - mp_.cx_) * depth / mp_.fx_;
         proj_pt(1) = (v - mp_.cy_) * depth / mp_.fy_;
         proj_pt(2) = depth;
@@ -757,11 +808,11 @@ void GridMap::projectDepthImage()
         {
 
           depth = (*row_ptr) * inv_factor;
-          bool is_free_ray = false;
-          if (depth == 0.0)                    // 先检查当前像素深度
+          // bool is_free_ray = false;
+          if (depth == 0.0)                    // 无有效深度：跳过，不生成 free 射线（避免地图外区域误标 free）
           {
-              depth = mp_.max_ray_length_ + 0.1;
-              is_free_ray = true;
+              row_ptr += mp_.skip_pixel_;
+              continue;
           }
           else if (depth < mp_.depth_filter_mindist_)
           {
@@ -770,7 +821,7 @@ void GridMap::projectDepthImage()
           else if (depth > mp_.depth_filter_maxdist_)
           {
               depth = mp_.max_ray_length_ + 0.1;
-              is_free_ray = true;
+              // is_free_ray = true;
           }
           row_ptr = row_ptr + mp_.skip_pixel_;
           
@@ -806,7 +857,9 @@ void GridMap::projectDepthImage()
         }
       }
 
-      // 处理 margin 区域的 depth=0 像素，为视野边缘生成 free 射线
+      // [禁用] 处理 margin 区域的 depth=0 像素，为视野边缘生成 free 射线
+      // 这些边缘 free 射线会打到墙外/室外，是"地图外区域被误标 free"的主要来源
+#if 0
       for (int v = 0; v < rows; v += mp_.skip_pixel_)
       {
         for (int u = 0; u < cols; u += mp_.skip_pixel_)
@@ -829,6 +882,7 @@ void GridMap::projectDepthImage()
           }
         }
       }
+#endif
     }
   }
 
@@ -1171,9 +1225,12 @@ void GridMap::clearAndInflateLocalMap()
 
 void GridMap::visCallback(const ros::TimerEvent & /*event*/)
 {
-  publishMap();
-  publishMapInflate(true);
-  publish2DOccupancyGrid();
+  if(md_->raycast_cnt_ > 10)
+  {
+    publishMap();
+    publishMapInflate(true);
+    publish2DOccupancyGrid();
+  }
 }
 
 void GridMap::updateOccupancyCallback(const ros::TimerEvent & /*event*/)
@@ -1183,6 +1240,7 @@ void GridMap::updateOccupancyCallback(const ros::TimerEvent & /*event*/)
 
   projectDepthImage();
   raycastProcess();
+  md_->raycast_cnt_ += 1;
 
   if (md_->local_updated_){
     clearAndInflateLocalMap();
@@ -1655,6 +1713,251 @@ void GridMap::depthOdomCallback(const sensor_msgs::ImageConstPtr &img,
   cv_ptr->image.copyTo(md_->depth_image_);
 
   md_->occ_need_update_ = true;
+}
+
+// ══════════════════════════════════════════════════════════════
+// 前沿检测 (BFS + PCA 递归分裂)
+// ══════════════════════════════════════════════════════════════
+
+bool GridMap::isFrontierCell(int gx, int gy) const {
+  if (gx < 0 || gx >= map_2d_width_ || gy < 0 || gy >= map_2d_height_)
+    return false;
+  int idx = gy * map_2d_width_ + gx;
+  if (occupancy_2d_persistent_[idx] != -1)  // 不是 unknown
+    return false;
+
+  // 4/8 邻域检查是否有 free cell（由 use_8neighbor_frontier_ 控制）
+  const int dx[8] = {-1, 1, 0, 0, -1, -1, 1, 1};
+  const int dy[8] = {0, 0, -1, 1, -1, 1, -1, 1};
+  const int num_dirs = use_8neighbor_frontier_ ? 8 : 4;
+  for (int k = 0; k < num_dirs; ++k) {
+    int nx = gx + dx[k], ny = gy + dy[k];
+    if (nx >= 0 && nx < map_2d_width_ && ny >= 0 && ny < map_2d_height_) {
+      if (occupancy_2d_persistent_[ny * map_2d_width_ + nx] == 0)
+        return true;  // unknown 邻接 free → 前沿
+    }
+  }
+  return false;
+}
+
+void GridMap::bfsGrowFrontier(int seed_gx, int seed_gy,
+                              const std::vector<int8_t>& occupancy,
+                              std::vector<bool>& visited,
+                              std::vector<std::pair<int, int>>& cluster_cells) const {
+  const int w = map_2d_width_, h = map_2d_height_;
+  std::queue<std::pair<int, int>> q;
+  q.push({seed_gx, seed_gy});
+  visited[seed_gy * w + seed_gx] = true;
+  cluster_cells.push_back({seed_gx, seed_gy});
+
+  // 8 邻域偏移
+  const int dx[8] = {-1, 0, 1, -1, 1, -1, 0, 1};
+  const int dy[8] = {-1, -1, -1, 0, 0, 1, 1, 1};
+
+  while (!q.empty()) {
+    auto [cx, cy] = q.front(); q.pop();
+
+    for (int k = 0; k < 8; ++k) {
+      int nx = cx + dx[k], ny = cy + dy[k];
+      if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+      int nidx = ny * w + nx;
+      if (visited[nidx]) continue;
+      if (occupancy[nidx] != -1) continue;  // 不是 unknown
+
+      // 检查是否是前沿 cell (有 free 邻域, 4或8邻域由标志位控制)
+      bool has_free = false;
+      const int fdx[8] = {-1, 1, 0, 0, -1, -1, 1, 1};
+      const int fdy[8] = {0, 0, -1, 1, -1, 1, -1, 1};
+      const int num_dirs = use_8neighbor_frontier_ ? 8 : 4;
+      for (int d = 0; d < num_dirs; ++d) {
+        int nnx = nx + fdx[d], nny = ny + fdy[d];
+        if (nnx >= 0 && nnx < w && nny >= 0 && nny < h &&
+            occupancy[nny * w + nnx] == 0) {
+          has_free = true; break;
+        }
+      }
+      if (has_free) {
+        visited[nidx] = true;
+        cluster_cells.push_back({nx, ny});
+        q.push({nx, ny});
+      }
+    }
+  }
+}
+
+Eigen::Vector3d GridMap::computeClusterCenter(
+    const std::vector<std::pair<int, int>>& cluster_cells, double z_height) const {
+  double sx = 0, sy = 0;
+  for (auto [gx, gy] : cluster_cells) {
+    double wx, wy;
+    gridToWorld(gx, gy, wx, wy);
+    sx += wx; sy += wy;
+  }
+  double n = cluster_cells.size();
+  return Eigen::Vector3d(sx / n, sy / n, z_height);
+}
+
+double GridMap::computeClusterSize(
+    const std::vector<std::pair<int, int>>& cluster_cells) const {
+  double min_x = 1e9, max_x = -1e9, min_y = 1e9, max_y = -1e9;
+  for (auto [gx, gy] : cluster_cells) {
+    double wx, wy;
+    gridToWorld(gx, gy, wx, wy);
+    if (wx < min_x) min_x = wx;
+    if (wx > max_x) max_x = wx;
+    if (wy < min_y) min_y = wy;
+    if (wy > max_y) max_y = wy;
+  }
+  return std::max(max_x - min_x, max_y - min_y);
+}
+
+void GridMap::splitClusterPCA(
+    const std::vector<std::pair<int, int>>& cluster_cells,
+    double cluster_size_xy,
+    std::vector<std::vector<std::pair<int, int>>>& result) const {
+
+  double sz = computeClusterSize(cluster_cells);
+  // 簇够小或点数太少 → 不分裂
+  if (sz <= cluster_size_xy || cluster_cells.size() <= 10) {
+    result.push_back(cluster_cells);
+    return;
+  }
+
+  // 转世界坐标矩阵 (N x 2)
+  int N = cluster_cells.size();
+  Eigen::MatrixXd pos(N, 2);
+  for (int i = 0; i < N; ++i) {
+    double wx, wy;
+    gridToWorld(cluster_cells[i].first, cluster_cells[i].second, wx, wy);
+    pos(i, 0) = wx; pos(i, 1) = wy;
+  }
+
+  // 协方差
+  Eigen::Vector2d mean = pos.colwise().mean();
+  Eigen::Matrix2d cov = Eigen::Matrix2d::Zero();
+  for (int i = 0; i < N; ++i) {
+    Eigen::Vector2d diff = pos.row(i).transpose() - mean;
+    cov += diff * diff.transpose();
+  }
+  cov /= N;
+
+  // 特征分解 → 第一主成分
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> es(cov);
+  Eigen::Vector2d pc1 = es.eigenvectors().col(1);  // 最大特征值对应向量
+
+  // 沿 PC1 投影 → 中位数二分
+  std::vector<double> proj(N);
+  for (int i = 0; i < N; ++i) {
+    proj[i] = (pos.row(i).transpose() - mean).dot(pc1);
+  }
+  std::vector<double> proj_sorted = proj;
+  std::nth_element(proj_sorted.begin(),
+                   proj_sorted.begin() + N / 2, proj_sorted.end());
+  double median = proj_sorted[N / 2];
+
+  std::vector<std::pair<int, int>> sub_a, sub_b;
+  for (int i = 0; i < N; ++i) {
+    if (proj[i] < median)
+      sub_a.push_back(cluster_cells[i]);
+    else
+      sub_b.push_back(cluster_cells[i]);
+  }
+
+  // 避免退化 (一边为空)
+  if (sub_a.empty() || sub_b.empty()) {
+    result.push_back(cluster_cells);
+    return;
+  }
+
+  splitClusterPCA(sub_a, cluster_size_xy, result);
+  splitClusterPCA(sub_b, cluster_size_xy, result);
+}
+
+void GridMap::detectFrontierClusters(
+    std::vector<std::pair<Eigen::Vector3d, double>>& frontier_pairs,
+    double z_height, double cluster_size_xy,
+    int min_cluster_cells, double min_frontier_size,
+    double min_center_dist) {
+
+  frontier_pairs.clear();
+  if (!has_2d_map_initialized_) return;
+
+  // Snapshot occupancy 数据，避免和 publish 线程竞争
+  std::vector<int8_t> occ_snapshot;
+  {
+    std::lock_guard<std::mutex> lock(map_2d_mutex_);
+    occ_snapshot = occupancy_2d_persistent_;
+  }
+
+  // 扫描范围：已探索区域 (currMapRange) → grid 索引
+  int xmin = 0, xmax = map_2d_width_ - 1;
+  int ymin = 0, ymax = map_2d_height_ - 1;
+  {
+    double wx_min, wy_min, wx_max, wy_max;
+    // getCurrMapRange 返回 (world_min, world_max) in XY
+    wx_min = currMapRangeMin_(0); wy_min = currMapRangeMin_(1);
+    wx_max = currMapRangeMax_(0); wy_max = currMapRangeMax_(1);
+    if (wx_max > wx_min + 0.01 && wy_max > wy_min + 0.01) {
+      xmin = std::max(0, (int)std::floor((wx_min - map_2d_origin_x_) * map_2d_res_inv_));
+      ymin = std::max(0, (int)std::floor((wy_min - map_2d_origin_y_) * map_2d_res_inv_));
+      xmax = std::min(map_2d_width_ - 1,
+                      (int)std::ceil((wx_max - map_2d_origin_x_) * map_2d_res_inv_));
+      ymax = std::min(map_2d_height_ - 1,
+                      (int)std::ceil((wy_max - map_2d_origin_y_) * map_2d_res_inv_));
+    }
+  }
+
+  // 外部 visited 数组
+  std::vector<bool> visited(map_2d_width_ * map_2d_height_, false);
+
+  // 逐 cell 扫描 → BFS
+  for (int gy = ymin; gy <= ymax; ++gy) {
+    for (int gx = xmin; gx <= xmax; ++gx) {
+      int idx = gy * map_2d_width_ + gx;
+      if (visited[idx]) continue;
+      if (occ_snapshot[idx] != -1) continue;
+
+      // 用作 isFrontierCell 检查：用 snapshot 数据 (4或8邻域由标志位控制)
+      bool is_ftr = false;
+      const int d8[8][2] = {{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{-1,1},{1,-1},{1,1}};
+      const int num_dirs = use_8neighbor_frontier_ ? 8 : 4;
+      for (int k = 0; k < num_dirs; ++k) {
+        int nx = gx + d8[k][0], ny = gy + d8[k][1];
+        if (nx >= 0 && nx < map_2d_width_ && ny >= 0 && ny < map_2d_height_) {
+          if (occ_snapshot[ny * map_2d_width_ + nx] == 0) {
+            is_ftr = true; break;
+          }
+        }
+      }
+      if (!is_ftr) continue;
+
+      // BFS 收集连通前沿
+      std::vector<std::pair<int, int>> cluster_cells;
+      bfsGrowFrontier(gx, gy, occ_snapshot, visited, cluster_cells);
+
+      // PCA 分裂
+      std::vector<std::vector<std::pair<int, int>>> sub_clusters;
+      splitClusterPCA(cluster_cells, cluster_size_xy, sub_clusters);
+
+      // 输出
+      for (auto& sub : sub_clusters) {
+        if ((int)sub.size() < min_cluster_cells) continue;
+        double sz = computeClusterSize(sub);
+        if (sz < min_frontier_size) continue;
+        Eigen::Vector3d center = computeClusterCenter(sub, z_height);
+        // Skip if too close to any already-accepted frontier center
+        bool too_close = false;
+        for (auto& fp : frontier_pairs) {
+          if ((center - fp.first).norm() < min_center_dist) {
+            too_close = true;
+            break;
+          }
+        }
+        if (too_close) continue;
+        frontier_pairs.push_back({center, sz});
+      }
+    }
+  }
 }
 
 // GridMap

@@ -135,10 +135,9 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES irobot_msgs
-#  CATKIN_DEPENDS geometry_msgs nav_msgs
-#  DEPENDS system_lib
+  INCLUDE_DIRS include
+  LIBRARIES SO3Control so3_control_nodelet
+  CATKIN_DEPENDS roscpp nav_msgs quadrotor_msgs tf nodelet
 )
 
 ###########

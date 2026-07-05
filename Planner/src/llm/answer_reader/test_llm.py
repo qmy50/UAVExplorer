@@ -10,9 +10,9 @@ class C:
 # 测试缓存里已有的标签
 ans, room, thresh = read_answer(
     
-'/home/tianbot/explorer_ws/src/Planner/src/llm/answers/llm_answer_mp3d.txt',
+'/home/tianbot/explorer_ws/src/Planner/src/llm/answers/llm_answer_hm3d.txt',
     '/tmp/llm_test_responses.txt',
-    'bed',  # 'bed'
+    'toilet',  # 'bed'
     C()
 )
 print(f'易混淆标签: {ans}')

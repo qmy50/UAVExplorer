@@ -1,14 +1,13 @@
 import cv2
 import numpy as np
 from vlm.coco_classes import COCO_CLASSES
-from vlm.detector.yolov7 import YOLOv7Client
+# from vlm.detector.yolov7 import YOLOv7Client
+from vlm.detector.yolo26_detect import YOLO26DetectClient
 from vlm.segmentor.sam import MobileSAMClient
 from vlm.detector.grounding_dino import GroundingDINOClient
-from vlm.itm.blip2itm import BLIP2ITMClient
 from vlm.utils.get_itm_message import get_itm_message
 
-yolov7_detector = YOLOv7Client(port=12184)
-blip2_itm = BLIP2ITMClient(port=12182)
+yolo26_detector = YOLO26DetectClient(port=12184)
 sam_segmentor = MobileSAMClient(port=12183)
 dino_detector = GroundingDINOClient(port=12181)
 
@@ -87,7 +86,7 @@ def get_object(right_label, img, cfg, similar_answer):
                 coco_label.append(label)
 
     if coco_label:
-        detections = yolov7_detector.predict(img, agnostic_nms=cfg.yolo.agnostic_nms, 
+        detections = yolo26_detector.predict(img, agnostic_nms=cfg.yolo.agnostic_nms, 
                                             conf_thres=cfg.yolo.confidence_threshold_yolo, iou_thres=cfg.yolo.iou_threshold_yolo)
         for idx in range(len(detections.logits)):
             label_detected = detections.phrases[idx]
@@ -139,7 +138,7 @@ def get_object_with_itm(label, img, cfg):
     itm_score_list = []
     segmented_img = img.copy()
     if label in COCO_CLASSES:
-        detections = yolov7_detector.predict(img, agnostic_nms=cfg.yolo.agnostic_nms,
+        detections = yolo26_detector.predict(img, agnostic_nms=cfg.yolo.agnostic_nms,
                                              conf_thres=cfg.yolo.confidence_threshold_yolo, iou_thres=cfg.yolo.iou_threshold_yolo)
         for idx in range(len(detections.logits)):
             label_detected = detections.phrases[idx]

@@ -117,6 +117,8 @@ public:
     fx_ = fx; fy_ = fy; cx_ = cx; cy_ = cy;
     intrinsics_set_ = true;
   }
+  void publishEmptyMarkers();
+  void publishEmptyCloud();
 
 private:
   // ==================== ROS Callbacks ====================
@@ -152,7 +154,7 @@ private:
 
   void publishClusterMarkers(const vector<Eigen::Vector3d>& centers);
   void publishClusterCloud(const pcl::PointCloud<Point3D>::Ptr& cloud);
-  void publishEmptyMarkers();
+
 
   // ==================== Data Members ====================
 

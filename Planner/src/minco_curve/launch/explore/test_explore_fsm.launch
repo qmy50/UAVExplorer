@@ -62,7 +62,7 @@
     <!-- <remap from="/position_cmd" to="planning/pos_cmd"/> -->
     <remap from="~position_cmd" to="drone_$(arg drone_id)_position_cmd"/>
     <remap from="~planning/trajectory" to="drone_$(arg drone_id)_planning/trajectory"/>
-    <remap from="~odom_world" to="$(arg odom_topic)"/>
+    <remap from="~odom_world" to="drone_$(arg drone_id)_$(arg odom_topic)"/>
     <param name="~time_forward" value="1.0" type="double"/>
     <param name="~publish_pose_cmd" value="false" /> 
     <param name="~publish_cmd_vel" value="false"/>
@@ -71,7 +71,7 @@
   </node>
 
   <node pkg="waypoint_generator" name="drone_$(arg drone_id)_waypoint_generator" type="waypoint_generator" output="screen">
-    <remap from="~odom" to="$(arg odom_topic)"/>        
+    <remap from="~odom" to="drone_$(arg drone_id)_$(arg odom_topic)"/>
     <remap from="~goal" to="drone_$(arg drone_id)/move_base_simple/goal_mine"/>
     <remap from="~traj_start_trigger" to="/traj_start_trigger" />
     <param name="waypoint_type" value="manual-lonely-waypoint"/>    

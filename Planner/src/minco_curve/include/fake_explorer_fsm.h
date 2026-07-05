@@ -49,10 +49,10 @@ private:
   FakePlanManager::Ptr planner_manager_;
   double predict_dt_;
   bool use_kalman_filter_;
- 
-  double replan_thresh_;          
-  double planning_horizen_;      
-  double emergency_stop_time_;   
+
+  double replan_thresh_;
+  double planning_horizen_;
+  double emergency_stop_time_;
   bool have_odom_, have_traj_,touch_goal_,trigger_;
   bool executing_cluster_target_;   // true: cluster target mode, disable DEP exploration replanning
   bool cluster_path_ready_;        // true: PRM path to cluster target found, proceed to WAIT_TRAJ
@@ -64,7 +64,7 @@ private:
 
 
 
-  Eigen::Vector3d odom_pos_, odom_vel_, odom_acc_;  
+  Eigen::Vector3d odom_pos_, odom_vel_, odom_acc_;
   Eigen::Vector3d target_pt_, target_vel_,target_acc_;
   Eigen::Vector3d cluster_target_pt_;
   bool has_cluster_target_;
@@ -76,11 +76,11 @@ private:
   bool odom_jumped_;           // flag: odom just jumped, wait before replanning
   ros::Time odom_jump_time_;   // when the jump happened
   double odom_jump_cooldown_;  // seconds to wait after a jump before replanning
-  
-  std::vector<Eigen::Vector3d> waypoint_list_;          
-  int current_wp_idx_;   
-  int consecutive_replan_cnt_;                           
-  
+
+  std::vector<Eigen::Vector3d> waypoint_list_;
+  int current_wp_idx_;
+  int consecutive_replan_cnt_;
+
   ros::NodeHandle node_;
   ros::Timer exec_timer_, dep_timer_;
   ros::Subscriber odom_sub_, waypoint_sub_, trigger_sub_, mandatory_stop_sub_,plan_sub_;
@@ -110,8 +110,7 @@ private:
   void publishTraj(const traj_utils::PolyTraj &traj_msg);
   // dwa
   double current_yaw_,current_angular_z_;
-  // swarm
-  // void RecvBroadcastMINCOTrajCallback(const traj_utils::MINCOTrajConstPtr &msg);
+
   void VisuaWaypoints(const std::vector<Eigen::Vector3d> &traj, ros::Publisher marker_pub);
   // bool have_recv_pre_agent_;
   // ros::Publisher checkpoints_pub_ ,broadcast_ploytraj_pub_;
@@ -169,10 +168,11 @@ private:
   bool is_backtracking_;
   int dep_fail_cnt_;
 
+  bool skip_init_rotate_;            // 跳过初始环顾旋转 (默认 true)
   int init_rotate_step_;            // 当前步 (0 ~ total_steps-1)
   int init_rotate_total_steps_;     // 总旋转步数 (默认 12×30°=360°)
   double init_rotate_angle_per_step_; // 每步旋转角度 (rad, 默认 M_PI/6)
-  ros::Time init_rotate_start_time_;  // 当前步开始时间                                              
+  ros::Time init_rotate_start_time_;  // 当前步开始时间
 
 };
 

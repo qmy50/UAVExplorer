@@ -17,11 +17,13 @@ find_package(catkin REQUIRED COMPONENTS
     plan_env
     path_searching
     global_planner
+    traj_utils
     actionlib
     actionlib_msgs
 )
 
-# PCL
+# OpenCV & PCL
+find_package(OpenCV REQUIRED)
 find_package(PCL REQUIRED)
 find_package(message_generation REQUIRED)
 
@@ -30,6 +32,7 @@ include_directories(
     include
     ${catkin_INCLUDE_DIRS}
     ${EIGEN3_INCLUDE_DIR}
+    ${OpenCV_INCLUDE_DIRS}
     ${PCL_INCLUDE_DIRS}
 )
 
@@ -52,7 +55,7 @@ generate_messages(
 catkin_package(
     INCLUDE_DIRS include
     LIBRARIES PATH_SEARCHER_LIB
-    CATKIN_DEPENDS nav_msgs roscpp tf
+    CATKIN_DEPENDS nav_msgs roscpp tf traj_utils
 )
 
 
@@ -76,12 +79,26 @@ add_executable(fake_explorer_indoor_node
 
 add_dependencies(fake_explorer_indoor_node ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
-# 链接库（仅链接实际需要的）
 target_link_libraries(fake_explorer_indoor_node
     ${catkin_LIBRARIES}
+    ${OpenCV_LIBRARIES}
     ${PCL_LIBRARIES}
 )
 
+# Habitat 版本: 使用独立的 habitat 入口（避免 ODR 冲突）
+add_executable(fake_explorer_fsm_habitat_node
+    src/fake_explorer_node_habitat.cpp
+    src/fake_explorer_fsm_habitat.cpp
+    src/plan_manager.cpp
+    src/traj_optimizer_3D.cpp)
+
+add_dependencies(fake_explorer_fsm_habitat_node ${${PROJECT_NAME}_EXPORTED_TARGETS})
+
+target_link_libraries(fake_explorer_fsm_habitat_node
+    ${catkin_LIBRARIES}
+    ${OpenCV_LIBRARIES}
+    ${PCL_LIBRARIES}
+)
 
 add_executable(traj_server_node src/traj_server.cpp)
 
@@ -98,6 +115,12 @@ add_executable(fake_odom_node src/fake_odom.cpp)
 target_link_libraries(fake_odom_node
     ${catkin_LIBRARIES}
 )
+
+# add_executable(habitat_action_server_node src/habitat_action_server.cpp)
+# add_dependencies(habitat_action_server_node ${${PROJECT_NAME}_EXPORTED_TARGETS})
+# target_link_libraries(habitat_action_server_node
+#     ${catkin_LIBRARIES}
+# )
 
 
 add_executable(test_node 

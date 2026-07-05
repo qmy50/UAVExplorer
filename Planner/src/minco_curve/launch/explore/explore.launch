@@ -1,6 +1,6 @@
 <launch>
-	    <arg name="map_size_x" value="20.0"/>
-	    <arg name="map_size_y" value="20.0"/>
+	    <arg name="map_size_x" value="15.0"/>
+	    <arg name="map_size_y" value="15.0"/>
     	<arg name="map_size_z" value=" 5.0"/>
 		<arg name="random_map_size_x_" value="15"/>
 		<arg name="random_map_size_y_" value="15"/>
@@ -37,9 +37,9 @@
 		
 		<include file="$(find minco_curve)/launch/explore/test_explore_fsm.launch">
 			<arg name="drone_id"   value="0"/>
-			<arg name="init_x"     value="-8"/>
+			<arg name="init_x"     value="-6"/>
 			<arg name="init_y"     value="0"/>
-			<arg name="init_z"     value="1.5"/>
+			<arg name="init_z"     value="0.5"/>
 			<arg name="map_size_x" value="$(arg map_size_x)"/>
 			<arg name="map_size_y" value="$(arg map_size_y)"/>
 			<arg name="map_size_z" value="$(arg map_size_z)"/>

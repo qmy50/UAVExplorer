@@ -9,6 +9,7 @@
 #include <plan_env/grid_map_indoor.h>
 // #include "simple_dwa.h"
 #include <traj_utils/Waypoints.h>
+// #include <plan_env/value_map2d.h>
 
 
 namespace fake_planner{
@@ -61,8 +62,22 @@ namespace fake_planner{
             TrajContainer traj_;
             GlobalTrajData global_data_;
             GridMap::Ptr grid_map_;
+            // std::shared_ptr<ValueMap2D> value_map_;
             ros::Publisher my_traj_pub_,other_traj_pub_;
 
+            inline bool needRePlanHabitat(const std::vector<Eigen::Vector3d>& Path){
+                for(const auto& waypoint_position : Path){
+                    if(grid_map_->getInflateOccupancy(waypoint_position) == 1){
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+
+            inline std::vector<Eigen::Vector3d> getCurrentWaypoints(){
+                return path_optimizer_rebound_->getCurrentAstarPath();
+            }
 
         private:
             PathPlannerSim3D::Ptr path_optimizer_rebound_;
@@ -74,7 +89,6 @@ namespace fake_planner{
         public:
             typedef std::unique_ptr<FakePlanManager> Ptr;
     };
-
 }
 
 

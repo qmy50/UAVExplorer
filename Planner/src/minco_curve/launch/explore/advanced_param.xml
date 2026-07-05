@@ -24,7 +24,7 @@
   <!-- main node -->
   <!-- launch-prefix="gdb -ex run - -args" -->
   
-    <node pkg="minco_curve" name="drone_$(arg drone_id)_fake_explorer_node" type="fake_explorer_node" output="screen">
+    <node pkg="minco_curve" name="drone_$(arg drone_id)_fake_explorer_node" type="fake_explorer_indoor_node" output="screen">
     <remap from="~odom_world" to="/drone_$(arg drone_id)_$(arg odometry_topic)"/>
     <remap from="~grid_map/odom" to="/drone_$(arg drone_id)_$(arg odometry_topic)"/>
     <remap from="~grid_map/cloud" to="/drone_$(arg drone_id)_$(arg cloud_topic)"/>
@@ -57,15 +57,17 @@
     <param name="fsm/interstep_dist" value="0.8" type="double"/>
     <param name="fsm/path_progress_thresh" value="0.5" type="double"/>
 
-    <param name="grid_map/resolution"      value="0.1" /> 
+    <param name="fsm/skip_init_rotate" value="true" type="bool"/>
+
+    <param name="grid_map/resolution"      value="0.1" />
     <param name="grid_map/map_size_x"   value="$(arg map_size_x_)" /> 
     <param name="grid_map/map_size_y"   value="$(arg map_size_y_)" /> 
     <param name="grid_map/map_size_z"   value="$(arg map_size_z_)" /> 
     <param name="grid_map/local_update_range_x"  value="6.0" /> 
     <param name="grid_map/local_update_range_y"  value="6.0" /> 
     <param name="grid_map/local_update_range_z"  value="4.5" /> 
-    <param name="grid_map/obstacles_inflation"     value="0.15" /> 
-    <param name="grid_map/local_map_margin" value="30"/>
+    <param name="grid_map/obstacles_inflation"     value="0.09" /> 
+    <param name="grid_map/local_map_margin" value="55"/>
     <param name="grid_map/ground_height"        value="-0.01"/>
     <!-- map origin: defaults to (-map_size_x/2, -map_size_y/2) → center at (0,0) -->
     <!-- uncomment to shift map center -->
@@ -93,8 +95,8 @@
     <param name="grid_map/min_ray_length" value="0.1"/>
     <param name="grid_map/max_ray_length" value="4.5"/>
     <param name="grid_map/max_2d_ray_length" value="2.0"/>
-    <param name="grid_map/height_range_min" value="1.0"/>
-    <param name="grid_map/height_range_max" value="1.5"/>
+    <param name="grid_map/height_range_min" value="0.0"/>
+    <param name="grid_map/height_range_max" value="1.0"/>
 
     <param name="grid_map/virtual_ceil_height"   value="2.5"/>
     <param name="grid_map/visualization_truncate_height"   value="2.4"/>

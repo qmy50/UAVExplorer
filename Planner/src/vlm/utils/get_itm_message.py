@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from vlm.itm.blip2itm import BLIP2ITMClient
 
-itmclient = BLIP2ITMClient(port=12182)
+itmclient = BLIP2ITMClient(port=12185)
 
 def get_itm_message(rgb_image, label):
     txt = f"Is there a {label} in the image?"

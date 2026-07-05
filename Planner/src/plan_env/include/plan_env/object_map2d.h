@@ -21,6 +21,8 @@
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/common/common.h>
 #include <unordered_map>
+#include <algorithm>
+#include <cmath>
 
 using Eigen::Vector2d;
 using Eigen::Vector2i;
@@ -122,6 +124,7 @@ public:
   int getObjectGrid(const int& adr);
 
   void publishObjectClouds();
+  void publishEmptyCloud();
   void wrapYaw(double& yaw);
 
   pcl::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> all_object_clouds_;
@@ -205,12 +208,12 @@ inline bool ObjectMap2D::isConfidenceObject(const ObjectCluster& obj)
 inline void ObjectMap2D::printFusionInfo(const ObjectCluster& obj, int label, const char* state)
 {
   // Use purple for high-confidence label 0, green for others
-  if (label == 0 && obj.confidence_scores_[label] >= min_confidence_)
-    ROS_WARN("%s%s id = %d label = %d confidence score = %.3lf %s", T_COLORS[5], state, obj.id_,
-        label, obj.confidence_scores_[label], T_COLORS[0]);
-  else
-    ROS_WARN("%s%s id = %d label = %d confidence score = %.3lf %s", T_COLORS[2], state, obj.id_,
-        label, obj.confidence_scores_[label], T_COLORS[0]);
+  // if (label == 0 && obj.confidence_scores_[label] >= min_confidence_)
+  //   // ROS_WARN("%s%s id = %d label = %d confidence score = %.3lf %s", T_COLORS[5], state, obj.id_,
+  //   //     label, obj.confidence_scores_[label], T_COLORS[0]);
+  // else
+  //   // ROS_WARN("%s%s id = %d label = %d confidence score = %.3lf %s", T_COLORS[2], state, obj.id_,
+  //   //     label, obj.confidence_scores_[label], T_COLORS[0]);
 }
 
 // --- 2D coordinate helpers ---
@@ -459,6 +462,16 @@ inline Eigen::Vector4d ObjectMap2D::getColor(const double& h, double alpha)
   return fcolor;
 }
 
+inline void ObjectMap2D::publishEmptyCloud()
+{
+  pcl::PointCloud<pcl::PointXYZRGB> empty_cloud;
+  sensor_msgs::PointCloud2 output;
+  pcl::toROSMsg(empty_cloud, output);
+  output.header.frame_id = "map";
+  output.header.stamp = ros::Time::now();
+  object_cloud_pub_.publish(output);
+}
+
 inline void ObjectMap2D::publishObjectClouds()
 {
   // Create colored point cloud container
@@ -498,8 +511,8 @@ inline void ObjectMap2D::publishObjectClouds()
   }
 
   if (combined_colored_cloud->points.empty()) {
-    ROS_ERROR("[ObjectMap2D] publishObjectClouds: %lu total objects, %d skipped (no label), 0 published — nothing to visualize!",
-        objects_.size(), skipped_no_label);
+    //ROS_ERROR("[ObjectMap2D] publishObjectClouds: %lu total objects, %d skipped (no label), 0 published — nothing to visualize!",
+    //    objects_.size(), skipped_no_label);
     return;  // No objects to visualize
   }
 
@@ -510,7 +523,7 @@ inline void ObjectMap2D::publishObjectClouds()
 
   // Publish the combined visualization
   sensor_msgs::PointCloud2 output;
-  ROS_ERROR("[ObjectMap2D] PUBLISHING: %d objects, %lu points to /object/clouds", published, combined_colored_cloud->points.size());
+  //ROS_ERROR("[ObjectMap2D] PUBLISHING: %d objects, %lu points to /object/clouds", published, combined_colored_cloud->points.size());
   pcl::toROSMsg(*combined_colored_cloud, output);
   output.header.frame_id = "map";
   output.header.stamp = ros::Time::now();

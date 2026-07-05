@@ -1,0 +1,640 @@
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00843-DYehNKdT76V/DYehNKdT76V.basis.glb
+Episode ID: 191
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    28   |
+|     SPL      |   9.65  |
+|   Soft SPL   |  12.41  |
+| Dist to Goal | 51.8195 |
++--------------+---------+
+success or not: success
+target to find is sofa
+No.40 task is finished
+3617.58 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00843-DYehNKdT76V/DYehNKdT76V.basis.glb
+Episode ID: 178
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    27   |
+|     SPL      |   9.15  |
+|   Soft SPL   |  11.94  |
+| Dist to Goal | 51.7108 |
++--------------+---------+
+success or not: timeout
+target to find is bed
+No.39 task is finished
+3589.90 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00843-DYehNKdT76V/DYehNKdT76V.basis.glb
+Episode ID: 6
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    27   |
+|     SPL      |   9.15  |
+|   Soft SPL   |  11.94  |
+| Dist to Goal | 35.3648 |
++--------------+---------+
+success or not: timeout
+target to find is chair
+No.38 task is finished
+3385.39 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00843-DYehNKdT76V/DYehNKdT76V.basis.glb
+Episode ID: 20
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    27   |
+|     SPL      |   9.15  |
+|   Soft SPL   |  11.67  |
+| Dist to Goal | 27.2962 |
++--------------+---------+
+success or not: unknown failure (active stop)
+target to find is toilet
+No.37 task is finished
+3180.85 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 10
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    27   |
+|     SPL      |   9.15  |
+|   Soft SPL   |  11.67  |
+| Dist to Goal | 19.5596 |
++--------------+---------+
+success or not: success
+target to find is chair
+No.36 task is finished
+3148.25 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 23
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    26   |
+|     SPL      |   8.76  |
+|   Soft SPL   |  11.29  |
+| Dist to Goal | 19.5431 |
++--------------+---------+
+success or not: success
+target to find is sofa
+No.35 task is finished
+3093.09 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 47
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    25   |
+|     SPL      |   8.43  |
+|   Soft SPL   |  10.96  |
+| Dist to Goal | 19.3985 |
++--------------+---------+
+success or not: unknown failure (active stop)
+target to find is toilet
+No.34 task is finished
+2986.32 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 5
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    25   |
+|     SPL      |   8.43  |
+|   Soft SPL   |  10.49  |
+| Dist to Goal | 17.2100 |
++--------------+---------+
+success or not: success
+target to find is chair
+No.33 task is finished
+2948.37 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 40
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    24   |
+|     SPL      |   8.11  |
+|   Soft SPL   |  10.18  |
+| Dist to Goal | 17.1955 |
++--------------+---------+
+success or not: success
+target to find is sofa
+No.32 task is finished
+2872.67 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 17
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    23   |
+|     SPL      |   7.34  |
+|   Soft SPL   |   9.41  |
+| Dist to Goal | 17.1753 |
++--------------+---------+
+success or not: unknown failure (active stop)
+target to find is toilet
+No.31 task is finished
+2840.70 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 8
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    23   |
+|     SPL      |   7.34  |
+|   Soft SPL   |   9.22  |
+| Dist to Goal | 14.8040 |
++--------------+---------+
+success or not: success
+target to find is sofa
+No.30 task is finished
+2722.23 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 38
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    22   |
+|     SPL      |   6.95  |
+|   Soft SPL   |   8.83  |
+| Dist to Goal | 14.7236 |
++--------------+---------+
+success or not: success
+target to find is chair
+No.29 task is finished
+2650.28 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 14
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    21   |
+|     SPL      |   6.80  |
+|   Soft SPL   |   8.68  |
+| Dist to Goal | 14.7071 |
++--------------+---------+
+success or not: timeout
+target to find is toilet
+No.28 task is finished
+2561.07 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 51
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    21   |
+|     SPL      |   6.80  |
+|   Soft SPL   |   8.38  |
+| Dist to Goal | 14.6046 |
++--------------+---------+
+success or not: success
+target to find is sofa
+No.27 task is finished
+2356.32 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 50
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    20   |
+|     SPL      |   6.47  |
+|   Soft SPL   |   8.06  |
+| Dist to Goal | 14.5829 |
++--------------+---------+
+success or not: success
+target to find is bed
+No.26 task is finished
+2159.28 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 45
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    19   |
+|     SPL      |   6.09  |
+|   Soft SPL   |   7.67  |
+| Dist to Goal | 14.5795 |
++--------------+---------+
+success or not: success
+target to find is toilet
+No.25 task is finished
+2023.72 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 34
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    18   |
+|     SPL      |   5.61  |
+|   Soft SPL   |   7.21  |
+| Dist to Goal | 14.4287 |
++--------------+---------+
+success or not: success
+target to find is bed
+No.24 task is finished
+1937.32 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 22
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    17   |
+|     SPL      |   5.55  |
+|   Soft SPL   |   7.15  |
+| Dist to Goal | 14.4020 |
++--------------+---------+
+success or not: success
+target to find is bed
+No.23 task is finished
+1826.25 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 31
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    16   |
+|     SPL      |   5.19  |
+|   Soft SPL   |   6.79  |
+| Dist to Goal | 14.3763 |
++--------------+---------+
+success or not: unknown failure (active stop)
+target to find is sofa
+No.22 task is finished
+1739.48 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 19
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    16   |
+|     SPL      |   5.19  |
+|   Soft SPL   |   6.52  |
+| Dist to Goal | 12.3128 |
++--------------+---------+
+success or not: unknown failure (active stop)
+target to find is toilet
+No.21 task is finished
+1715.31 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 6
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    16   |
+|     SPL      |   5.19  |
+|   Soft SPL   |   5.97  |
+| Dist to Goal | 10.6772 |
++--------------+---------+
+success or not: success
+target to find is bed
+No.20 task is finished
+1677.86 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 26
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    15   |
+|     SPL      |   4.94  |
+|   Soft SPL   |   5.72  |
+| Dist to Goal | 10.6446 |
++--------------+---------+
+success or not: success
+target to find is chair
+No.19 task is finished
+1624.30 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 7
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    14   |
+|     SPL      |   4.63  |
+|   Soft SPL   |   5.41  |
+| Dist to Goal | 10.6382 |
++--------------+---------+
+success or not: timeout
+target to find is sofa
+No.18 task is finished
+1582.19 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 2
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    14   |
+|     SPL      |   4.63  |
+|   Soft SPL   |   5.08  |
+| Dist to Goal | 10.5842 |
++--------------+---------+
+success or not: success
+target to find is chair
+No.17 task is finished
+1378.11 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 54
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    13   |
+|     SPL      |   4.31  |
+|   Soft SPL   |   4.76  |
+| Dist to Goal | 10.5764 |
++--------------+---------+
+success or not: success
+target to find is chair
+No.16 task is finished
+1333.11 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 35
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    12   |
+|     SPL      |   4.06  |
+|   Soft SPL   |   4.51  |
+| Dist to Goal | 10.5596 |
++--------------+---------+
+success or not: success
+target to find is sofa
+No.15 task is finished
+1280.21 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 12
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    11   |
+|     SPL      |   3.66  |
+|   Soft SPL   |   4.11  |
+| Dist to Goal | 10.5277 |
++--------------+---------+
+success or not: success
+target to find is sofa
+No.14 task is finished
+1213.94 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 36
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    10   |
+|     SPL      |   3.11  |
+|   Soft SPL   |   3.58  |
+| Dist to Goal | 10.4855 |
++--------------+---------+
+success or not: success
+target to find is sofa
+No.13 task is finished
+1180.57 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 3
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    9    |
+|     SPL      |   2.83  |
+|   Soft SPL   |   3.30  |
+| Dist to Goal | 10.3895 |
++--------------+---------+
+success or not: unknown failure (active stop)
+target to find is sofa
+No.12 task is finished
+1056.88 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 42
++--------------+--------+
+|    Metric    | Total  |
++--------------+--------+
+|   Success    |   9    |
+|     SPL      |  2.83  |
+|   Soft SPL   |  3.09  |
+| Dist to Goal | 8.1621 |
++--------------+--------+
+success or not: success
+target to find is toilet
+No.11 task is finished
+1033.26 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 55
++--------------+--------+
+|    Metric    | Total  |
++--------------+--------+
+|   Success    |   8    |
+|     SPL      |  2.75  |
+|   Soft SPL   |  3.01  |
+| Dist to Goal | 8.0113 |
++--------------+--------+
+success or not: unknown failure (active stop)
+target to find is bed
+No.10 task is finished
+856.30 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 21
++--------------+--------+
+|    Metric    | Total  |
++--------------+--------+
+|   Success    |   8    |
+|     SPL      |  2.75  |
+|   Soft SPL   |  2.84  |
+| Dist to Goal | 4.5031 |
++--------------+--------+
+success or not: unknown failure (active stop)
+target to find is toilet
+No.9 task is finished
+787.54 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 48
++--------------+--------+
+|    Metric    | Total  |
++--------------+--------+
+|   Success    |   8    |
+|     SPL      |  2.75  |
+|   Soft SPL   |  2.73  |
+| Dist to Goal | 0.4386 |
++--------------+--------+
+success or not: success
+target to find is chair
+No.8 task is finished
+658.23 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 33
++--------------+--------+
+|    Metric    | Total  |
++--------------+--------+
+|   Success    |   7    |
+|     SPL      |  2.23  |
+|   Soft SPL   |  2.21  |
+| Dist to Goal | 0.4198 |
++--------------+--------+
+success or not: success
+target to find is chair
+No.7 task is finished
+620.60 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 20
++--------------+--------+
+|    Metric    | Total  |
++--------------+--------+
+|   Success    |   6    |
+|     SPL      |  1.91  |
+|   Soft SPL   |  1.89  |
+| Dist to Goal | 0.3740 |
++--------------+--------+
+success or not: success
+target to find is chair
+No.6 task is finished
+548.70 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 49
++--------------+--------+
+|    Metric    | Total  |
++--------------+--------+
+|   Success    |   5    |
+|     SPL      |  1.66  |
+|   Soft SPL   |  1.64  |
+| Dist to Goal | 0.3355 |
++--------------+--------+
+success or not: success
+target to find is toilet
+No.5 task is finished
+465.99 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 43
++--------------+--------+
+|    Metric    | Total  |
++--------------+--------+
+|   Success    |   4    |
+|     SPL      |  1.51  |
+|   Soft SPL   |  1.50  |
+| Dist to Goal | 0.1787 |
++--------------+--------+
+success or not: success
+target to find is bed
+No.4 task is finished
+316.23 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 15
++--------------+--------+
+|    Metric    | Total  |
++--------------+--------+
+|   Success    |   3    |
+|     SPL      |  1.03  |
+|   Soft SPL   |  1.02  |
+| Dist to Goal | 0.1440 |
++--------------+--------+
+success or not: success
+target to find is bed
+No.3 task is finished
+240.37 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 30
++--------------+--------+
+|    Metric    | Total  |
++--------------+--------+
+|   Success    |   2    |
+|     SPL      |  0.39  |
+|   Soft SPL   |  0.38  |
+| Dist to Goal | 0.1145 |
++--------------+--------+
+success or not: success
+target to find is chair
+No.2 task is finished
+183.94 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 27
++--------------+--------+
+|    Metric    | Total  |
++--------------+--------+
+|   Success    |   1    |
+|     SPL      |  0.25  |
+|   Soft SPL   |  0.24  |
+| Dist to Goal | 0.0940 |
++--------------+--------+
+success or not: success
+target to find is bed
+No.1 task is finished
+108.84 seconds spend in this task
+

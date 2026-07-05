@@ -1,0 +1,61 @@
+<launch>
+  <!-- Habitat 离散动作模式 — 保留原始 FSM 状态机, 去掉 MINCO/PX4 -->
+
+  <arg name="map_size_x" value="30"/>
+  <arg name="map_size_y" value="30.0"/>
+  <arg name="map_size_z" value="1.0"/>
+  <arg name="fixed_frame" default="world"/>
+  <arg name="max_vel" value="0.2" />
+  <arg name="max_acc" value="0.2" />
+  <arg name="odom_topic" value="/drone_0_visual_slam/odom"/>
+
+  <!-- TF -->
+  <node pkg="tf" type="static_transform_publisher" name="map_to_world"
+        args="0.0 0.0 0 0.0 0.0 0.0 /map /world 40" />
+  <node pkg="tf" type="static_transform_publisher" name="world_to_ground"
+        args="0.0 0.0 0 0.0 0.0 0.0 /world /ground_plane 40" />
+
+  <!-- 原始 FSM (HABITAT 模式: 跳过 MINCO, 发 /habitat/waypoints) -->
+  <include file="$(find minco_curve)/launch/habitat/advanced_param_habitat.xml">
+    <arg name="map_size_x_" value="$(arg map_size_x)"/>
+    <arg name="map_size_y_" value="$(arg map_size_y)"/>
+    <arg name="map_size_z_" value="$(arg map_size_z)"/>
+    <arg name="odometry_topic" value="$(arg odom_topic)"/>
+    <arg name="depth_topic" value="/habitat/camera_depth"/>
+    <arg name="cx" value="321.04638671875"/>
+    <arg name="cy" value="243.44969177246094"/>
+    <arg name="fx" value="387.229248046875"/>
+    <arg name="fy" value="387.229248046875"/>
+    <arg name="max_vel" value="$(arg max_vel)" />
+    <arg name="max_acc" value="$(arg max_acc)" />
+    <arg name="planning_horizon" value="7.5" />
+    <arg name="drone_id" default="0"/>
+    <arg name="use_real_model" value="false"/>
+  </include>
+
+  <!-- Odometry visualization -->
+  <node pkg="odom_visualization" name="odom_visualization" type="odom_visualization" output="screen">
+      <remap from="~odom" to="$(arg odom_topic)"/>
+      <param name="color/a" value="0.5"/>
+      <param name="color/r" value="1.0"/>
+      <param name="color/g" value="0.0"/>
+      <param name="color/b" value="0.0"/>
+      <param name="covariance_scale" value="100.0"/>
+      <param name="robot_scale" value="0.5"/>
+      <param name="tf45" value="true"/>
+  </node>
+
+  <!-- Habitat Action Server: waypoints+旋转 → 离散动作 → /habitat/plan_action -->
+  <!-- <node pkg="minco_curve" name="habitat_action_server_node" type="habitat_action_server_node" output="screen">
+    <param name="odom_topic" value="$(arg odom_topic)"/>
+  </node> -->
+
+  <!-- DEP params -->
+  <rosparam file="$(find global_planner)/cfg/dep_param_indoor_habitat.yaml" ns="DEP"/>
+  <param name="DEP/odom_topic" value="$(arg odom_topic)"/>
+
+  <!-- RViz -->
+  <node pkg="rviz" type="rviz" name="minco_rviz"
+        args="-d $(find minco_curve)/rviz/display_habitat.rviz" output="screen"/>
+
+</launch>

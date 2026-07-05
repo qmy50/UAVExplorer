@@ -20,6 +20,7 @@
   <depend>path_searching</depend>
 
   <depend>global_planner</depend>
+  <depend>traj_utils</depend>
   <depend>message_generation</depend>
   <depend>actionlib</depend>
   <depend>actionlib_msgs</depend>

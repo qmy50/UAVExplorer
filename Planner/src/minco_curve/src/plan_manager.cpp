@@ -21,6 +21,8 @@ namespace fake_planner{
         path_optimizer_rebound_->setParam(nh);
         path_optimizer_rebound_->setEnvironment(grid_map_);
 
+        // value_map_.reset(new ValueMap2D(grid_map_));
+
         nh.param("fsm/use_dwa",use_dwa_,false);
 
         // if(use_dwa_){

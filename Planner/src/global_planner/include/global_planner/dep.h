@@ -42,7 +42,14 @@ namespace globalPlanner{
 
 		// semantic value map parameters
 		double semanticWeight_ = 1.0;  ///< Weight for semantic value in path scoring
+		double candidateSemanticWeight_ = 0.5;  ///< Weight for semantic value in candidate goal ranking
+		double semanticBypassThresh_ = 0.3;   ///< Semantic value threshold to bypass gain filter
 		bool useValueMap_ = true;      ///< Whether to use semantic value map
+
+		// frontier bonus parameters
+		double frontierWeight_ = 0.0;           ///< Weight for frontier proximity bonus in path scoring
+		double candidateFrontierWeight_ = 0.0;  ///< Weight for frontier proximity bonus in candidate ranking
+		double frontierBonusRadius_ = 2.0;      ///< Radius (m) within which a node gets frontier proximity bonus
 		double latestItmScore_ = 0.0;   ///< Latest ITM score from BLIP2 (/blip2/itm_score)
 		bool itmScoreReceived_ = false; ///< Whether we have received at least one ITM score
 
@@ -58,6 +65,11 @@ namespace globalPlanner{
 		int localSampleThresh_;
 		int globalSampleThresh_;
 		int frontierSampleThresh_;
+		double cluster_size_xy_ = 2.0;       // 前沿 PCA 分裂阈值 (m)
+		int    min_cluster_cells_ = 5;        // 最小前沿 cell 数
+		double min_frontier_size_ = 0.5;      // 最小前沿跨度 (m)
+		double min_frontier_center_dist_ = 2.0; // 前沿中心最小间距 (m)
+		bool use_8neighbor_frontier_ = false;    ///< 8邻域frontier检测开关
 		double distThresh_;
 		double safeDistXY_;
 		double safeDistZ_;
@@ -75,6 +87,12 @@ namespace globalPlanner{
 		int maxCandidateNum_;
 		double updateDist_;
 		double yawPenaltyWeight_;
+		double yawDistScale_ = 3.0;            ///< Scale factor: yaw penalty grows as (1 + distance/yawDistScale_)
+		int depPlanCount_ = 0;                 ///< Planning cycle counter, drives dynamic distance penalty
+		double distPenaltyMax_ = 15.0;         ///< Initial distance penalty weight (early exploration)
+		double distPenaltyMin_ = 3.0;          ///< Final distance penalty weight (late exploration)
+		int distPenaltyRampCycles_ = 50;       ///< Cycles to ramp from max to min penalty
+		double yaw_replan_threshold_ = M_PI_2;  ///< Initial yaw change threshold to trigger replan (rad)
 		std::vector<double> height_layers_;  ///< Available height layers for PRM node Z sampling
 		int current_height_layer_idx_;      ///< Current active height layer index (0-based)
 		int cross_layer_links_;             ///< Max cross-layer edges to add per new node (0=disabled)
@@ -90,6 +108,7 @@ namespace globalPlanner{
 		std::vector<std::shared_ptr<PRM::Node>> goalCandidates_;
 		std::vector<std::vector<std::shared_ptr<PRM::Node>>> candidatePaths_;
 		std::vector<std::shared_ptr<PRM::Node>> bestPath_;
+		double initial_yaw_change_ = 0.0;       ///< Yaw change from current heading to first path segment (rad)
 		std::vector<std::pair<Eigen::Vector3d, double>> frontierPointPairs_;  //前沿区域（Frontier Region）的中心位置及其区域大小
 
 
@@ -98,6 +117,7 @@ namespace globalPlanner{
 
 				// 新增2D地图相关
 		bool use2DMap_ = true;  // 是否使用2D地图做碰撞检测
+		bool goalPathFind_ = false;
 
 		// // 2D碰撞检查辅助方法
 		// bool is2DOccupied(double x, double y);        // 查询2D栅格是否占据
@@ -129,6 +149,9 @@ namespace globalPlanner{
 		void updateRoadmapOnly();
 		void switchHeightLayer();           ///< Cycle to next height layer and log the switch
 		void dropCurrentGoalNode();         ///< Remove current bestPath goal node & edges, clear candidates
+		double getInitialYawChange() const { return initial_yaw_change_; }  ///< Yaw change to first path segment
+		double getFrontierProximity(const Eigen::Vector3d& pos) const;   ///< Compute proximity score [0,1] to nearest frontier cluster
+		double getYawReplanThreshold() const { return yaw_replan_threshold_; }
 
 
 		// callback functions
@@ -157,6 +180,10 @@ namespace globalPlanner{
 		void publishBestPath();
 		void publishFrontier();
 		void publishValueMap();           ///< Publish value map as OccupancyGrid + OpenCV heatmap
+
+		inline double GetITM(const Eigen::Vector2d& pos){
+            return value_map_->getITM(pos);
+        }
 	};
 }
 

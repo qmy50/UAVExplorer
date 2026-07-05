@@ -43,7 +43,7 @@ PathPlannerSim3D::PathPlannerSim3D(ros::NodeHandle &nh,const int& id)
         grid_map_ = map;
 
         a_star_.reset(new AStar(drone_id_));
-        a_star_->initGridMap(grid_map_, Eigen::Vector3i(100, 100, 100));
+        a_star_->initGridMap(grid_map_, Eigen::Vector3i(200, 200, 200));
         has_map_ = true;
 
     }
@@ -64,6 +64,15 @@ PathPlannerSim3D::PathPlannerSim3D(ros::NodeHandle &nh,const int& id)
         }
         return false;
     }
+
+    // bool PathPlannerSim3D::checkTrajCollisionHabitat(const std::vector<Eigen::Vector3d>& Path){
+    //     for(const auto& waypoint_position : Path){
+    //         if(grid_map_->getInflateOccupancy(waypoint_position) == 1){
+    //             return true;
+    //         }
+    //     }
+    //     return false;
+    // }
 
     PathPlannerSim3D::VectorXd PathPlannerSim3D::timeAllocation(const std::vector<Eigen::Vector3d>& Path,
                         double max_vel, double max_acc,
@@ -270,8 +279,10 @@ PathPlannerSim3D::PathPlannerSim3D(ros::NodeHandle &nh,const int& id)
 
         if(flag == ASTAR_RET::SUCCESS){
            current_minco_waypoints_ = a_star_->getPath();
+           current_a_star_waypoints_ = a_star_->getPath();
            have_a_star_path_ = true;
            have_minco_waypoints_=true;
+           ROS_WARN("A star Success, path size = %zu", current_minco_waypoints_.size());
         }else{
             ROS_WARN("A star Failed, quit");
             return;
@@ -415,7 +426,7 @@ void PathPlannerSim3D::VisuaWaypoints(const std::vector<Eigen::Vector3d> &traj, 
 
 void PathPlannerSim3D::MapCallback(const sensor_msgs::PointCloud2::ConstPtr& pointcloud_map){
     if(!has_map_ || have_current_traj_)return;
-    ROS_INFO_THROTTLE(1.0,"Have Local Map");
+    // ROS_INFO_THROTTLE(1.0,"Have Local Map");
     pcl::PointCloud<pcl::PointXYZ> cloud;
     local_obstacles_.clear();
     // pcl::PointCloud<pcl::PointXYZ> cloud_vis;

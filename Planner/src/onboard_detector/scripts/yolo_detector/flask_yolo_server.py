@@ -22,15 +22,19 @@ Response:      [{"mask": "<base64 png>", "label_name": "car",
                  "bbox": [x1, y1, x2, y2]}, ...]
 """
 
+# Mitigate CUDA memory fragmentation (helps when two models share 8 GB VRAM)
+import os
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
 import argparse
 import base64
 import io
-import os
 import sys
 import time
 
 import cv2
 import numpy as np
+import torch
 from flask import Flask, request, jsonify
 
 from ultralytics import YOLO
@@ -48,22 +52,55 @@ DETECT_FIRST = False   # control flag: True → detect then segment; False → s
 path_curr = os.path.dirname(os.path.abspath(__file__))
 
 
+def _gpu_memory_info():
+    """Return (allocated_MiB, reserved_MiB, free_MiB, total_MiB) or None if no CUDA."""
+    if not torch.cuda.is_available():
+        return None
+    alloc = torch.cuda.memory_allocated() / (1024 ** 2)
+    reserv = torch.cuda.memory_reserved() / (1024 ** 2)
+    total = torch.cuda.get_device_properties(0).total_memory / (1024 ** 2)
+    free = total - reserv
+    return alloc, reserv, free, total
+
+
+def _log_gpu(label="GPU"):
+    """Print GPU memory usage with a label."""
+    info = _gpu_memory_info()
+    if info:
+        alloc, reserv, free, total = info
+        print(f"[FlaskYOLO] {label}: allocated={alloc:.0f}MiB reserved={reserv:.0f}MiB "
+              f"free={free:.0f}MiB total={total:.0f}MiB")
+
+
 def load_model(weight_path, detect_weight_path, class_names_path, conf_thresh, img_size, detect_first):
     global MODEL, DETECT_MODEL, LABEL_NAMES, CONF_THRESH, IMG_SIZE, DETECT_FIRST
 
     DETECT_FIRST = detect_first
+    _log_gpu("before loading")
 
     if DETECT_FIRST:
         # Load both models
         DETECT_MODEL = YOLO(detect_weight_path)
+        DETECT_MODEL.model.half()
+        torch.cuda.empty_cache()
+        _log_gpu("after detect model (FP16)")
+
         MODEL = YOLO(weight_path)  # segmentation model
-        print(f"[FlaskYOLO] Mode: DETECT → SEGMENT (two-stage pipeline)")
+        MODEL.model.half()
+        torch.cuda.empty_cache()
+        _log_gpu("after seg model (FP16)")
+
+        print(f"[FlaskYOLO] Mode: DETECT → SEGMENT (two-stage pipeline, FP16)")
         print(f"[FlaskYOLO] Detection model : {detect_weight_path}")
         print(f"[FlaskYOLO] Segmentation model: {weight_path}")
     else:
         # Load segmentation model only (default)
         MODEL = YOLO(weight_path)
-        print(f"[FlaskYOLO] Mode: SEGMENT ONLY (single-stage)")
+        MODEL.model.half()
+        torch.cuda.empty_cache()
+        _log_gpu("after seg model (FP16)")
+
+        print(f"[FlaskYOLO] Mode: SEGMENT ONLY (FP16)")
         print(f"[FlaskYOLO] Segmentation model: {weight_path}")
 
     with open(class_names_path, 'r') as f:
@@ -143,7 +180,10 @@ def _detect_then_segment(ori_img, target_classes, encode_mask):
     detections = []
 
     # Stage 1 — Detection
-    det_results = DETECT_MODEL(ori_img, conf=CONF_THRESH, imgsz=IMG_SIZE, verbose=False)
+    torch.cuda.empty_cache()
+    with torch.no_grad():
+        det_results = DETECT_MODEL(ori_img, conf=CONF_THRESH, imgsz=IMG_SIZE, verbose=False)
+    torch.cuda.empty_cache()
 
     for result in det_results:
         boxes = result.boxes
@@ -154,8 +194,6 @@ def _detect_then_segment(ori_img, target_classes, encode_mask):
             category_id = int(boxes.cls[i].cpu().numpy())
             category = LABEL_NAMES[category_id]
             confidence = float(boxes.conf[i].cpu().numpy())
-
-            print(f"categoty is {category}")
 
             # Filter by target classes
             if target_classes and category not in target_classes:
@@ -180,7 +218,9 @@ def _detect_then_segment(ori_img, target_classes, encode_mask):
                 roi = ori_img[y1:y2, x1:x2]
                 roi_h, roi_w = y2 - y1, x2 - x1
                 roi_cx, roi_cy = roi_w // 2, roi_h // 2
-                seg_results = MODEL(roi, conf=CONF_THRESH, imgsz=IMG_SIZE, verbose=False)
+
+                with torch.no_grad():
+                    seg_results = MODEL(roi, conf=CONF_THRESH, imgsz=IMG_SIZE, verbose=False)
 
                 # Collect all valid (mask, seg_cls_id, seg_conf) from the ROI
                 mask_candidates = []  # each: (mask_np, seg_cls_id, seg_conf, center_dist)
@@ -240,10 +280,18 @@ def _detect_then_segment(ori_img, target_classes, encode_mask):
                         mask_full.astype(np.float32), W, H)
                 else:
                     det["mask"] = None
+
+                # Free per-box GPU memory
+                del seg_results, mask_candidates, best_mask
+                torch.cuda.empty_cache()
             else:
                 det["mask"] = None
 
             detections.append(det)
+
+    # Free detection results memory
+    del det_results
+    torch.cuda.empty_cache()
 
     return detections
 
@@ -256,7 +304,10 @@ def _segment_directly(ori_img, target_classes, encode_mask):
     H, W = ori_img.shape[:2]
     detections = []
 
-    results = MODEL(ori_img, conf=CONF_THRESH, imgsz=IMG_SIZE, verbose=False)
+    torch.cuda.empty_cache()
+    with torch.no_grad():
+        results = MODEL(ori_img, conf=CONF_THRESH, imgsz=IMG_SIZE, verbose=False)
+    torch.cuda.empty_cache()
 
     for result in results:
         boxes = result.boxes
@@ -292,6 +343,9 @@ def _segment_directly(ori_img, target_classes, encode_mask):
 
             detections.append(det)
 
+    del results
+    torch.cuda.empty_cache()
+
     return detections
 
 
@@ -303,8 +357,8 @@ if __name__ == '__main__':
     parser.add_argument('--detect-weight', default=os.path.join(path_curr, 'weights/yolo26s.pt'),
                         help='Detection model weight path (used when --detect-first)')
     parser.add_argument('--classes', default=os.path.join(path_curr, 'config/coco.names'))
-    parser.add_argument('--conf', type=float, default=0.7)
-    parser.add_argument('--imgsz', type=int, default=640)
+    parser.add_argument('--conf', type=float, default=0.35)
+    parser.add_argument('--imgsz', type=int, default=320)
     parser.add_argument('--host', default='127.0.0.1')
     parser.add_argument('--detect-first', action='store_true', default=False,
                         help='Enable two-stage pipeline: detect (boxes) → segment (masks)')

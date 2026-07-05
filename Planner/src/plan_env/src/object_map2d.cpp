@@ -24,13 +24,13 @@ ObjectMap2D::ObjectMap2D(GridMap::Ptr grid_map, ros::NodeHandle& nh)
 
   // Load configuration parameters
   min_confidence_ = -1.0;  // Default to accept all detections
-  nh.param("object/min_observation_num", min_observation_num_, 10);
+  nh.param("object/min_observation_num", min_observation_num_, 2);
   nh.param("object/fusion_type", fusion_type_, 1);
   nh.param("object/use_observation", use_observation_, true);
   nh.param("object/vis_cloud", is_vis_cloud_, true);
 
   // Setup ROS communication
-  object_cloud_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/object/clouds", 10);
+  object_cloud_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/object/clouds", 10, true);  // latched: RViz 重连自动收到最后一条
 
   // Resolution will be set from the 2D grid once initialized
   resolution_ = grid_map_->getRes();
@@ -159,9 +159,9 @@ int ObjectMap2D::searchSingleObjectCluster(const DetectedObject& detected_object
   vector<Eigen::Vector2d> object_point2Ds;
   vector<char> flag_2d(voxel_num_, 0);  // Duplicate point prevention
 
-  int out_of_bounds = 0, dup_count = 0, not_satisfy = 0, satisfy_count = 0;
-  ROS_ERROR("[ObjectMap2D] searchSingleObjectCluster ENTER: cloud_points=%d label=%d score=%.3f initialized=%d",
-      point_num, detected_object.label, detected_object.score, initialized_);
+  int out_of_bounds = 0, dup_count = 0, satisfy_count = 0;
+  //ROS_ERROR("[ObjectMap2D] searchSingleObjectCluster ENTER: cloud_points=%d label=%d score=%.3f initialized=%d",
+  //    point_num, detected_object.label, detected_object.score, initialized_);
 
   // Process each point in the detected object cloud
   for (int i = 0; i < point_num; i++) {
@@ -192,12 +192,12 @@ int ObjectMap2D::searchSingleObjectCluster(const DetectedObject& detected_object
     // }
   }
 
-  ROS_ERROR("[ObjectMap2D] Point stats: total_3d=%d unique_2d=%d oob=%d dup=%d",
-      point_num, satisfy_count, out_of_bounds, dup_count);
+  //ROS_ERROR("[ObjectMap2D] Point stats: total_3d=%d unique_2d=%d oob=%d dup=%d",
+  //    point_num, satisfy_count, out_of_bounds, dup_count);
 
   // Return early if no valid object points found
   if (object_point2Ds.empty()) {
-    ROS_ERROR("[ObjectMap2D] FAIL: no valid 2D grid cells — all points out of bounds!");
+    //ROS_ERROR("[ObjectMap2D] FAIL: no valid 2D grid cells — all points out of bounds!");
     return -1;
   }
 
@@ -245,7 +245,7 @@ int ObjectMap2D::searchSingleObjectCluster(const DetectedObject& detected_object
 
   // Validate successful clustering
   if (obj_idx == -1) {
-    ROS_ERROR("[bug] Why not find the object cluster!?");
+    //ROS_ERROR("[bug] Why not find the object cluster!?");
     return obj_idx;
   }
 
@@ -263,8 +263,8 @@ void ObjectMap2D::updateObjectBestLabel(int obj_idx)
     auto score = objects_[obj_idx].confidence_scores_[label];
     int func_score = obs_sum * score;  // Combined reliability metric
 
-    ROS_ERROR("[ObjectMap2D] updateBestLabel obj=%d label=%d obs_sum=%d score=%.3f func_score=%d",
-        obj_idx, label, obs_sum, score, func_score);
+    // ROS_ERROR("[ObjectMap2D] updateBestLabel obj=%d label=%d obs_sum=%d score=%.3f func_score=%d",
+        // obj_idx, label, obs_sum, score, func_score);
 
     if (func_score > max_func_score) {
       max_func_score = func_score;
@@ -272,8 +272,8 @@ void ObjectMap2D::updateObjectBestLabel(int obj_idx)
     }
   }
   objects_[obj_idx].best_label_ = best_label;
-  ROS_ERROR("[ObjectMap2D] updateBestLabel obj=%d → best_label=%d (max_func_score=%d, threshold=0.1)",
-      obj_idx, best_label, (int)max_func_score);
+  // ROS_ERROR("[ObjectMap2D] updateBestLabel obj=%d → best_label=%d (max_func_score=%d, threshold=0.1)",
+      // obj_idx, best_label, (int)max_func_score);
 }
 
 void ObjectMap2D::createNewObjectCluster(
@@ -399,7 +399,7 @@ void ObjectMap2D::mergeCellsIntoObjectCluster(const int& merged_object_id,
           merged_object.good_cells_.push_back(cell);
       }
     }
-    ROS_ERROR("merged_object good cells size = %ld", merged_object.good_cells_.size());
+    //ROS_ERROR("merged_object good cells size = %ld", merged_object.good_cells_.size());
   }
 
   // Recompute spatial properties
@@ -541,50 +541,78 @@ void ObjectMap2D::getObjectBoxes(vector<Vector3d>& bmin, vector<Vector3d>& bmax)
 
 bool ObjectMap2D::getBestObjectTarget(Eigen::Vector3d& target, const Eigen::Vector3d& drone_pos)
 {
-  // Find the highest-confidence valid object and pick the nearest AABB face center
+  // Find the highest-confidence valid object.
+  // Filter out depth outliers (e.g. near-field mis-segmentation) before picking
+  // the nearest surface point, so the agent doesn't get pulled toward wrong objects.
   double best_score = -1.0;
   int best_idx = -1;
-  Eigen::Vector3d best_face = Eigen::Vector3d::Zero();
+  Eigen::Vector3d best_point = Eigen::Vector3d::Zero();
 
   for (size_t i = 0; i < objects_.size(); i++) {
     const auto& obj = objects_[i];
     int label = obj.best_label_;
+    if (label != 0) continue;
     if (label < 0 || label >= (int)obj.clouds_.size()) continue;
     if (obj.confidence_scores_[label] < min_confidence_) continue;
 
-    // Compute 6 AABB face centers
-    Eigen::Vector3d center = (obj.box_min3d_ + obj.box_max3d_) * 0.5;
-    std::vector<Eigen::Vector3d> faces = {
-      Eigen::Vector3d(obj.box_min3d_.x(), center.y(), center.z()),
-      Eigen::Vector3d(obj.box_max3d_.x(), center.y(), center.z()),
-      Eigen::Vector3d(center.x(), obj.box_min3d_.y(), center.z()),
-      Eigen::Vector3d(center.x(), obj.box_max3d_.y(), center.z()),
-      Eigen::Vector3d(center.x(), center.y(), obj.box_min3d_.z()),
-      Eigen::Vector3d(center.x(), center.y(), obj.box_max3d_.z()),
-    };
+    // Get the 3D point cloud for this object's best label
+    const auto& cloud = obj.clouds_[label];
+    if (!cloud || cloud->points.empty()) continue;
 
-    // Find nearest face to drone
+    // --- Compute median XY-distance to identify the dominant depth layer ---
+    const size_t n = cloud->points.size();
+    std::vector<double> dists(n);
+    for (size_t j = 0; j < n; ++j) {
+      dists[j] = (Eigen::Vector2d(cloud->points[j].x, cloud->points[j].y)
+                   - drone_pos.head<2>()).norm();
+    }
+    std::nth_element(dists.begin(), dists.begin() + n / 2, dists.end());
+    double median_dist = dists[n / 2];
+
+    // Filter: keep only points within ±1.5 m of the median depth layer,
+    // discarding near-field / far-field mis-segmentation outliers.
     double min_dist = std::numeric_limits<double>::max();
-    Eigen::Vector3d nearest_face = center;
-    for (const auto& fc : faces) {
-      double d = (fc - drone_pos).norm();
+    Eigen::Vector3d closest_pt = Eigen::Vector3d::Zero();
+    bool found = false;
+    for (const auto& pt : cloud->points) {
+      double d = (Eigen::Vector2d(pt.x, pt.y) - drone_pos.head<2>()).norm();
+      if (std::abs(d - median_dist) > 0.5) continue;  // depth outlier → skip
+      found = true;
       if (d < min_dist) {
         min_dist = d;
-        nearest_face = fc;
+        closest_pt = Eigen::Vector3d(pt.x, pt.y, pt.z);
       }
     }
+
+    // Fallback: if filter removed everything (tight single-layer object), use all points
+    if (!found) {
+      for (const auto& pt : cloud->points) {
+        Eigen::Vector3d pt3d(pt.x, pt.y, pt.z);
+        double d = (pt3d.head<2>() - drone_pos.head<2>()).norm();
+        if (d < min_dist) {
+          min_dist = d;
+          closest_pt = pt3d;
+        }
+      }
+    }
+
+    // Project target Z to drone height for 2D path planning
+    closest_pt.z() = drone_pos.z();
 
     // Score: confidence weighted by inverse distance
     double score = obj.confidence_scores_[label] / (min_dist + 0.5);
     if (score > best_score) {
       best_score = score;
       best_idx = i;
-      best_face = nearest_face;
+      best_point = closest_pt;
     }
   }
 
   if (best_idx < 0) return false;
-  target = best_face;
+  target = best_point;
+  target(0) = std::floor(target(0) / resolution_) * resolution_;
+  target(1) = std::floor(target(1) / resolution_) * resolution_;
+  target(2) = std::floor(target(2) / resolution_) * resolution_;
   return true;
 }
 

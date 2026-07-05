@@ -4,6 +4,7 @@ def read_answer(llm_answer_path, llm_response_path, label, llm_client):
     label_existing = False
 
     with open(llm_answer_path, "a+") as f:
+        # print("open")
         f.seek(0)
         lines = f.readlines()
 

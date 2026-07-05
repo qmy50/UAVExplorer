@@ -55,7 +55,7 @@ void ObjectMapManager::init()
 
   // --- Clustering parameters ---
   pnh.param("depth_min_value", depth_min_value_, 0.5);
-  pnh.param("depth_max_value", depth_max_value_, 5.0);
+  pnh.param("depth_max_value", depth_max_value_, 2.5);
   pnh.param("depth_scale_factor", depth_scale_factor_, 1000.0);
   pnh.param("skip_pixel", skip_pixel_, 2);
   pnh.param("cluster_tolerance", cluster_tolerance_, 0.3);
@@ -81,17 +81,30 @@ void ObjectMapManager::init()
     ROS_INFO("[ObjectMapManager] Loaded body_to_camera transform from params");
   }
 
+  bool habitat_mode = false;
+	ros::param::param("/use_habitat_mode", habitat_mode, true);
+
+
+
   // --- Topic names ---
   pnh.param<std::string>("single_mask_topic", single_mask_topic_,
                          "/yolo_detector/single_mask");
   pnh.param<std::string>("mask_topic", mask_topic_,
                          "/yolo_detector/mask_image");  // legacy
-  pnh.param<std::string>("depth_topic", depth_topic_,
-                         "/iris_0/realsense/depth_camera/depth/image_raw");
-  pnh.param<std::string>("camera_info_topic", camera_info_topic_,
-                         "/iris_0/realsense/depth_camera/color/camera_info");
-  pnh.param<std::string>("pose_topic", pose_topic_,
-                         "/iris_0/mavros/odometry/in");
+
+  if(habitat_mode){
+    pnh.param<std::string>("depth_topic", depth_topic_,
+                          "/habitat/camera_depth");
+    pnh.param<std::string>("pose_topic", pose_topic_,
+                            "/drone_0_visual_slam/odom");
+  }else{
+    pnh.param<std::string>("depth_topic", depth_topic_,
+                          "/iris_0/realsense/depth_camera/depth/image_raw");
+    pnh.param<std::string>("camera_info_topic", camera_info_topic_,
+                      "/iris_0/realsense/depth_camera/color/camera_info");
+    pnh.param<std::string>("pose_topic", pose_topic_,
+                          "/iris_0/mavros/odometry/in");
+  }
 
   // --- Subscribers ---
   single_mask_sub_ = nh_.subscribe(single_mask_topic_, 10,
@@ -100,8 +113,10 @@ void ObjectMapManager::init()
   //                           &ObjectMapManager::maskCallback, this);  // legacy
   depth_sub_ = nh_.subscribe(depth_topic_, 1,
                              &ObjectMapManager::depthCallback, this);
-  camera_info_sub_ = nh_.subscribe(camera_info_topic_, 1,
-                                   &ObjectMapManager::cameraInfoCallback, this);
+  if (!camera_info_topic_.empty()) {
+    camera_info_sub_ = nh_.subscribe(camera_info_topic_, 1,
+                                     &ObjectMapManager::cameraInfoCallback, this);
+  }
   pose_sub_ = nh_.subscribe(pose_topic_, 1,
                             &ObjectMapManager::poseCallback, this);
 
@@ -140,7 +155,7 @@ void ObjectMapManager::singleMaskCallback(
   try {
     cv_ptr = cv_bridge::toCvCopy(msg->mask, "mono8");
   } catch (cv_bridge::Exception& e) {
-    ROS_ERROR("[ObjectMapManager] singleMask cv_bridge exception: %s", e.what());
+    //("[ObjectMapManager] singleMask cv_bridge exception: %s", e.what());
     return;
   }
   // ROS_ERROR("[Object map] We got the yolo message !!!");
@@ -150,6 +165,8 @@ void ObjectMapManager::singleMaskCallback(
   det.confidence = msg->confidence;
   det.label_name = msg->label_name;
   // ROS_ERROR("[ObjectMapManager] We got the %s",msg->label_name.c_str());
+
+ // ROS_ERROR("{Object map manager} We got the yolo mask");
 
   pending_detections_.push_back(det);
 }
@@ -161,7 +178,7 @@ void ObjectMapManager::maskCallback(const sensor_msgs::ImageConstPtr& msg)
     latest_mask_ = cv_bridge::toCvCopy(msg, "bgr8")->image;
     mask_received_ = true;
   } catch (cv_bridge::Exception& e) {
-    ROS_ERROR("[ObjectMapManager] mask cv_bridge exception: %s", e.what());
+    //ROS_ERROR("[ObjectMapManager] mask cv_bridge exception: %s", e.what());
   }
 }
 
@@ -171,7 +188,7 @@ void ObjectMapManager::depthCallback(const sensor_msgs::ImageConstPtr& msg)
   try {
     cv_ptr = cv_bridge::toCvCopy(msg, msg->encoding);
   } catch (cv_bridge::Exception& e) {
-    ROS_ERROR("[ObjectMapManager] depth cv_bridge exception: %s", e.what());
+    //ROS_ERROR("[ObjectMapManager] depth cv_bridge exception: %s", e.what());
     return;
   }
 
@@ -180,8 +197,8 @@ void ObjectMapManager::depthCallback(const sensor_msgs::ImageConstPtr& msg)
   } else if (msg->encoding == sensor_msgs::image_encodings::TYPE_16UC1) {
     latest_depth_ = cv_ptr->image;
   } else {
-    ROS_ERROR_THROTTLE(5.0, "[ObjectMapManager] Unsupported depth encoding: %s",
-                       msg->encoding.c_str());
+    //ROS_ERROR_THROTTLE(5.0, "[ObjectMapManager] Unsupported depth encoding: %s",
+    //                   msg->encoding.c_str());
     return;
   }
   depth_received_ = true;
@@ -220,25 +237,25 @@ void ObjectMapManager::poseCallback(const nav_msgs::OdometryConstPtr& msg)
   latest_camera_pos_ = R_mb * t_bc + body_pos;
   pose_received_ = true;
 
-  ROS_ERROR_THROTTLE(2.0, "[ObjectMapManager] poseCallback: frame=%s body_pos=(%.2f,%.2f,%.2f) yaw=%.1f cam_pos=(%.2f,%.2f,%.2f)",
-      msg->header.frame_id.c_str(),
-      body_pos.x(), body_pos.y(), body_pos.z(),
-      atan2(R_mb(1,0), R_mb(0,0)) * 180.0 / M_PI,
-      latest_camera_pos_.x(), latest_camera_pos_.y(), latest_camera_pos_.z());
+  // ROS_ERROR_THROTTLE(2.0, "[ObjectMapManager] poseCallback: frame=%s body_pos=(%.2f,%.2f,%.2f) yaw=%.1f cam_pos=(%.2f,%.2f,%.2f)",
+  //     msg->header.frame_id.c_str(),
+  //     body_pos.x(), body_pos.y(), body_pos.z(),
+  //     atan2(R_mb(1,0), R_mb(0,0)) * 180.0 / M_PI,
+  //     latest_camera_pos_.x(), latest_camera_pos_.y(), latest_camera_pos_.z());
 }
 
 void ObjectMapManager::confidenceThresholdCallback(const std_msgs::Float64ConstPtr& msg)
 {
   double val = msg->data;
   object_map_->setConfidenceThreshold(val);
-  ROS_WARN_THROTTLE(3.0, "[ObjectMapManager] LLM confidence threshold updated: %.3f", val);
+  // ROS_WARN_THROTTLE(3.0, "[ObjectMapManager] LLM confidence threshold updated: %.3f", val);
 }
 
 void ObjectMapManager::processIfReady()
 {
   if (!pose_received_ || !depth_received_ || !intrinsics_set_) {
-    ROS_ERROR_THROTTLE(1.0, "[ObjectMapManager] WAIT: pose=%d depth=%d intrinsics=%d",
-        pose_received_, depth_received_, intrinsics_set_);
+    // ROS_ERROR_THROTTLE(1.0, "[ObjectMapManager] WAIT: pose=%d depth=%d intrinsics=%d",
+    //     pose_received_, depth_received_, intrinsics_set_);
     return;
   }
 
@@ -251,8 +268,8 @@ void ObjectMapManager::processIfReady()
     // batch.swap(pending_detections_);
 
     vector<PendingDetection> batch = std::move(pending_detections_);
-    ROS_ERROR("[ObjectMapManager] Processing %lu pending detections, camera_pos=(%.2f,%.2f,%.2f)",
-        batch.size(), latest_camera_pos_.x(), latest_camera_pos_.y(), latest_camera_pos_.z());
+    // ROS_ERROR("[ObjectMapManager] Processing %lu pending detections, camera_pos=(%.2f,%.2f,%.2f)",
+    //     batch.size(), latest_camera_pos_.x(), latest_camera_pos_.y(), latest_camera_pos_.z());
 
     // Collect all cluster centers and clouds for this frame
     vector<Eigen::Vector3d> all_centers;
@@ -265,8 +282,8 @@ void ObjectMapManager::processIfReady()
           latest_camera_pos_, latest_camera_R_,
           det.label_index, det.confidence);
 
-      ROS_ERROR("[ObjectMapManager] processMaskAndDepth returns n=%d for label=%d conf=%.2f",
-          n, det.label_index, det.confidence);
+      //ROS_ERROR("[ObjectMapManager] processMaskAndDepth returns n=%d for label=%d conf=%.2f",
+         // n, det.label_index, det.confidence);
     }
 
     return;
@@ -287,8 +304,8 @@ int ObjectMapManager::processMaskAndDepth(const cv::Mat& mask, const cv::Mat& de
     int label_index, double confidence)
 {
   if (mask.empty() || depth_16u.empty()) {
-    ROS_ERROR("[ObjectMapManager] processMaskAndDepth: mask_empty=%d depth_empty=%d",
-        mask.empty(), depth_16u.empty());
+    // ROS_ERROR("[ObjectMapManager] processMaskAndDepth: mask_empty=%d depth_empty=%d",
+    //     mask.empty(), depth_16u.empty());
     return 0;
   }
 
@@ -298,11 +315,11 @@ int ObjectMapManager::processMaskAndDepth(const cv::Mat& mask, const cv::Mat& de
   pcl::PointCloud<Point3D>::Ptr raw_cloud(new pcl::PointCloud<Point3D>);
   extractMaskPoints(mask, depth_16u, camera_R, camera_pos, raw_cloud);
 
-  ROS_ERROR("[ObjectMapManager] extractMaskPoints: raw_cloud size = %lu", raw_cloud->size());
+  //ROS_ERROR("[ObjectMapManager] extractMaskPoints: raw_cloud size = %lu", raw_cloud->size());
 
   if (raw_cloud->empty()) {
-    ROS_ERROR("[ObjectMapManager] FAIL: raw_cloud is empty — check mask/depth alignment and depth range [%.1f, %.1f]",
-        depth_min_value_, depth_max_value_);
+    // ROS_ERROR("[ObjectMapManager] FAIL: raw_cloud is empty — check mask/depth alignment and depth range [%.1f, %.1f]",
+    //     depth_min_value_, depth_max_value_);
     publishEmptyMarkers();
     return 0;
   }
@@ -311,8 +328,8 @@ int ObjectMapManager::processMaskAndDepth(const cv::Mat& mask, const cv::Mat& de
   vector<Eigen::Vector3d> cluster_centers;
   auto cluster_clouds = clusterPointCloud(raw_cloud, cluster_centers);
 
-  ROS_ERROR("[ObjectMapManager] clusterPointCloud: %lu clusters found, min_cluster_size=%d tolerance=%.2f",
-      cluster_clouds.size(), min_cluster_size_, cluster_tolerance_);
+  // ROS_ERROR("[ObjectMapManager] clusterPointCloud: %lu clusters found, min_cluster_size=%d tolerance=%.2f",
+  //     cluster_clouds.size(), min_cluster_size_, cluster_tolerance_);
 
   // Step 3: Collect all clustered points for visualization
   pcl::PointCloud<Point3D>::Ptr all_cluster_cloud(new pcl::PointCloud<Point3D>);
@@ -331,11 +348,11 @@ int ObjectMapManager::processMaskAndDepth(const cv::Mat& mask, const cv::Mat& de
     obj.score = confidence;      // From YOLO detection
     obj.label = label_index;     // From YOLO classification
 
-    ROS_ERROR("[ObjectMapManager] Feeding cluster %lu: points=%lu score=%.3f label=%d",
-        i, cluster_cloud->points.size(), confidence, label_index);
+    // ROS_ERROR("[ObjectMapManager] Feeding cluster %lu: points=%lu score=%.3f label=%d",
+    //     i, cluster_cloud->points.size(), confidence, label_index);
 
     int cluster_id = object_map_->searchSingleObjectCluster(obj);
-    ROS_ERROR("[ObjectMapManager] searchSingleObjectCluster returned cluster_id=%d", cluster_id);
+    //ROS_ERROR("[ObjectMapManager] searchSingleObjectCluster returned cluster_id=%d", cluster_id);
     if (cluster_id >= 0)
       fed_count++;
   }
@@ -457,58 +474,59 @@ void ObjectMapManager::extractMaskPoints(const cv::Mat& mask, const cv::Mat& dep
         pt.z = R(2, 0) * x_cam + R(2, 1) * y_cam + R(2, 2) * depth_m + t(2);
         cloud->push_back(pt);
       }
-    } else {
-      // --- BGR8 visual mask (legacy) ---
-      const cv::Vec3b* mask_row = mask.ptr<cv::Vec3b>(v);
-      for (int u = 0; u < W; u += skip_pixel_) {
-        const cv::Vec3b& pixel = mask_row[u];
-        if (pixel[0] == 0 && pixel[1] == 0 && pixel[2] == 0) continue;
-        mask_pixel_cnt++;
+    } 
+    // else {
+    //   // --- BGR8 visual mask (legacy) ---
+    //   const cv::Vec3b* mask_row = mask.ptr<cv::Vec3b>(v);
+    //   for (int u = 0; u < W; u += skip_pixel_) {
+    //     const cv::Vec3b& pixel = mask_row[u];
+    //     if (pixel[0] == 0 && pixel[1] == 0 && pixel[2] == 0) continue;
+    //     mask_pixel_cnt++;
 
-        double depth_m = static_cast<double>(depth_row[u]) * inv_scale;
-        if (depth_m < depth_min_value_ || depth_m > depth_max_value_) {
-          depth_oob_cnt++;
-          continue;
-        }
-        depth_valid_cnt++;
-        if (depth_m < depth_min_seen) depth_min_seen = depth_m;
-        if (depth_m > depth_max_seen) depth_max_seen = depth_m;
-        if (sample_u < 0) { sample_u = u; sample_v = v; sample_depth = depth_m; }
+    //     double depth_m = static_cast<double>(depth_row[u]) * inv_scale;
+    //     if (depth_m < depth_min_value_ || depth_m > depth_max_value_) {
+    //       depth_oob_cnt++;
+    //       continue;
+    //     }
+    //     depth_valid_cnt++;
+    //     if (depth_m < depth_min_seen) depth_min_seen = depth_m;
+    //     if (depth_m > depth_max_seen) depth_max_seen = depth_m;
+    //     if (sample_u < 0) { sample_u = u; sample_v = v; sample_depth = depth_m; }
 
-        double x_cam = (static_cast<double>(u) - cx_) * depth_m * inv_fx;
-        double y_cam = (static_cast<double>(v) - cy_) * depth_m * inv_fy;
+    //     double x_cam = (static_cast<double>(u) - cx_) * depth_m * inv_fx;
+    //     double y_cam = (static_cast<double>(v) - cy_) * depth_m * inv_fy;
 
-        Point3D pt;
-        pt.x = R(0, 0) * x_cam + R(0, 1) * y_cam + R(0, 2) * depth_m + t(0);
-        pt.y = R(1, 0) * x_cam + R(1, 1) * y_cam + R(1, 2) * depth_m + t(1);
-        pt.z = R(2, 0) * x_cam + R(2, 1) * y_cam + R(2, 2) * depth_m + t(2);
-        cloud->push_back(pt);
-      }
-    }
+    //     Point3D pt;
+    //     pt.x = R(0, 0) * x_cam + R(0, 1) * y_cam + R(0, 2) * depth_m + t(0);
+    //     pt.y = R(1, 0) * x_cam + R(1, 1) * y_cam + R(1, 2) * depth_m + t(1);
+    //     pt.z = R(2, 0) * x_cam + R(2, 1) * y_cam + R(2, 2) * depth_m + t(2);
+    //     cloud->push_back(pt);
+    //   }
+    // }
   }
 
   // ---- Debug: projection summary ----
-  if (cloud->empty()) {
-    ROS_ERROR("[ObjectMapManager] extractMaskPoints: FAILED — mask_px=%d depth_valid=%d depth_oob=%d (range=[%.1f,%.1f]m) "
-              "mask=%dx%d depth=%dx%d skip=%d fx=%.1f cx=%.1f",
-        mask_pixel_cnt, depth_valid_cnt, depth_oob_cnt, depth_min_value_, depth_max_value_,
-        W, H, depth_16u.cols, depth_16u.rows, skip_pixel_, fx_, cx_);
-  } else {
-    // Sample: first valid pixel → 3D
-    double sx = (sample_u - cx_) * sample_depth / fx_;
-    double sy = (sample_v - cy_) * sample_depth / fy_;
-    Point3D sp;
-    sp.x = R(0,0)*sx + R(0,1)*sy + R(0,2)*sample_depth + t(0);
-    sp.y = R(1,0)*sx + R(1,1)*sy + R(1,2)*sample_depth + t(1);
-    sp.z = R(2,0)*sx + R(2,1)*sy + R(2,2)*sample_depth + t(2);
-    ROS_ERROR("[ObjectMapManager] extractMaskPoints: cloud=%lu pts mask_px=%d depth_valid=%d depth_oob=%d "
-              "depth_range=[%.2f,%.2f]m mask=%dx%d skip=%d "
-              "SAMPLE: pixel(%d,%d) depth=%.2fm → cam(%.2f,%.2f,%.2f) → world(%.2f,%.2f,%.2f)",
-        cloud->size(), mask_pixel_cnt, depth_valid_cnt, depth_oob_cnt,
-        depth_min_seen, depth_max_seen, W, H, skip_pixel_,
-        sample_u, sample_v, sample_depth, sx, sy, sample_depth,
-        sp.x, sp.y, sp.z);
-  }
+  // if (cloud->empty()) {
+  //   // ROS_ERROR("[ObjectMapManager] extractMaskPoints: FAILED — mask_px=%d depth_valid=%d depth_oob=%d (range=[%.1f,%.1f]m) "
+  //   //           "mask=%dx%d depth=%dx%d skip=%d fx=%.1f cx=%.1f",
+  //   //     mask_pixel_cnt, depth_valid_cnt, depth_oob_cnt, depth_min_value_, depth_max_value_,
+  //   //     W, H, depth_16u.cols, depth_16u.rows, skip_pixel_, fx_, cx_);
+  // } else {
+  //   // Sample: first valid pixel → 3D
+  //   double sx = (sample_u - cx_) * sample_depth / fx_;
+  //   double sy = (sample_v - cy_) * sample_depth / fy_;
+  //   Point3D sp;
+  //   sp.x = R(0,0)*sx + R(0,1)*sy + R(0,2)*sample_depth + t(0);
+  //   sp.y = R(1,0)*sx + R(1,1)*sy + R(1,2)*sample_depth + t(1);
+  //   sp.z = R(2,0)*sx + R(2,1)*sy + R(2,2)*sample_depth + t(2);
+  //   ROS_ERROR("[ObjectMapManager] extractMaskPoints: cloud=%lu pts mask_px=%d depth_valid=%d depth_oob=%d "
+  //             "depth_range=[%.2f,%.2f]m mask=%dx%d skip=%d "
+  //             "SAMPLE: pixel(%d,%d) depth=%.2fm → cam(%.2f,%.2f,%.2f) → world(%.2f,%.2f,%.2f)",
+  //       cloud->size(), mask_pixel_cnt, depth_valid_cnt, depth_oob_cnt,
+  //       depth_min_seen, depth_max_seen, W, H, skip_pixel_,
+  //       sample_u, sample_v, sample_depth, sx, sy, sample_depth,
+  //       sp.x, sp.y, sp.z);
+  // }
 }
 
 // ==================== Private: Euclidean Clustering ====================
@@ -646,4 +664,10 @@ void ObjectMapManager::publishEmptyMarkers()
   clear.action = visualization_msgs::Marker::DELETEALL;
   marker_array.markers.push_back(clear);
   cluster_marker_pub_.publish(marker_array);
+  //object_map_->publishEmptyCloud();
+}
+
+void ObjectMapManager::publishEmptyCloud()
+{
+  object_map_->publishEmptyCloud();
 }

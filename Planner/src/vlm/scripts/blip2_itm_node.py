@@ -20,6 +20,7 @@ blip2_itm_node.py — BLIP2 Image-Text Matching ROS Node for ValueMap2D
      rosrun global_planner blip2_itm_node.py
 """
 
+import json
 import os
 import sys
 import time
@@ -29,7 +30,7 @@ import numpy as np
 import rospy
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
-from std_msgs.msg import Float64
+from std_msgs.msg import Float64, String
 
 # 将 vlm 包的父目录加入 Python path
 _VLM_PARENT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
@@ -46,11 +47,15 @@ class BLIP2ITMNode:
         rospy.init_node("blip2_itm_node", anonymous=False)
 
         # ---- 参数 ----
-        self.rgb_topic = rospy.get_param("~rgb_topic", "/iris_0/realsense/depth_camera/color/image_raw")
-        self.label = rospy.get_param("~label", "bed")
-        self.room = rospy.get_param("~room", "everywhere")
+        self.use_habitat = rospy.get_param("/use_habitat_mode",True)
+        if self.use_habitat:
+            self.rgb_topic = rospy.get_param("~rgb_topic", "/habitat/camera_rgb")
+        else:
+            self.rgb_topic = rospy.get_param("~rgb_topic", "/iris_0/realsense/depth_camera/color/image_raw")
+        self.label = rospy.get_param("~label", "toilet")
+        self.room = rospy.get_param("~room", "bathroom")
         self.publish_rate = rospy.get_param("~publish_rate", 1.0)
-        self.server_port = rospy.get_param("~server_port", 12182)
+        self.server_port = rospy.get_param("~server_port", 12185)
 
         # ---- HTTP 客户端 (连接 Flask BLIP2 服务器) ----
         rospy.loginfo("[BLIP2] Connecting to BLIP2 Flask server on port %d...", self.server_port)
@@ -70,6 +75,9 @@ class BLIP2ITMNode:
         self.image_sub = rospy.Subscriber(
             self.rgb_topic, Image, self._image_cb, queue_size=2
         )
+        self.target_sub = rospy.Subscriber(
+            "/vlm_bridge/target_config", String, self._target_config_cb
+        )
 
         # ---- 定时发布 ----
         self.timer = rospy.Timer(
@@ -86,6 +94,17 @@ class BLIP2ITMNode:
             self.image_received = True
         except Exception as e:
             rospy.logwarn("[BLIP2] Failed to convert image: %s", e)
+
+    def _target_config_cb(self, msg: String):
+        """接收 evaluation 发来的动态 target (label + room)"""
+        try:
+            config = json.loads(msg.data)
+            target_classes = config.get("target_classes", [])
+            self.label = target_classes[0] if target_classes else self.label
+            self.room = config.get("room", self.room)
+            rospy.loginfo("[BLIP2] Updated label='%s', room='%s'", self.label, self.room)
+        except Exception as e:
+            rospy.logerr("[BLIP2] Failed to parse target_config: %s", e)
 
     def _build_prompt(self) -> str:
         """根据 label 和 room 构造 BLIP2 ITM 的文本提示"""

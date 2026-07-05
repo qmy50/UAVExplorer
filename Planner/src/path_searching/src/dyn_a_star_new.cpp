@@ -177,7 +177,21 @@ ASTAR_RET AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d
 
     double tentative_gScore;
 
+    // ── 诊断: 统计 A* pool 内的障碍物数量 ──
+    int obstacle_cnt = 0, total_checked = 0;
+    for (int dx = 0; dx < POOL_SIZE_(0); dx += 5)
+      for (int dy = 0; dy < POOL_SIZE_(1); dy += 5)
+        for (int dz = 0; dz < POOL_SIZE_(2); dz += 5) {
+          Eigen::Vector3i idx(dx, dy, dz);
+          total_checked++;
+          if (checkOccupancy(Index2Coord(idx), drone_id_))
+            obstacle_cnt++;
+        }
+    ROS_WARN("[AStar] Pool obstacle scan: %d/%d cells occupied (step=%.2f center=%.1f,%.1f,%.1f)",
+             obstacle_cnt, total_checked, step_size_, center_.x(), center_.y(), center_.z());
+
     int num_iter = 0;
+    int obstacle_skipped = 0;
     const int max_iter = 100000;  // 最大迭代次数，防止无限循环
     while (!openSet_.empty())
     {
@@ -191,10 +205,8 @@ ASTAR_RET AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d
 
         if (current->index(0) == endPtr->index(0) && current->index(1) == endPtr->index(1) && current->index(2) == endPtr->index(2))
         {
-            // ros::Time time_2 = ros::Time::now();
-            // printf("\033[34mA star iter:%d, time:%.3f\033[0m\n",num_iter, (time_2 - time_1).toSec()*1000);
-            // if((time_2 - time_1).toSec() > 0.1)
-            //     ROS_WARN("Time consume in A star path finding is %f", (time_2 - time_1).toSec() );
+            ROS_WARN("[AStar] SUCCESS: %d iters, %d nodes blocked by obstacles, path len=%zu",
+                     num_iter, obstacle_skipped, retrievePath(current).size());
             gridPath_ = retrievePath(current);
             return ASTAR_RET::SUCCESS;
         }
@@ -231,6 +243,7 @@ ASTAR_RET AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d
 
                     if (checkOccupancy(Index2Coord(neighborPtr->index),drone_id_))
                     {
+                        obstacle_skipped++;
                         continue;
                     }
 

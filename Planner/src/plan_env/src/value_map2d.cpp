@@ -9,6 +9,40 @@
  */
 
 #include <plan_env/value_map2d.h>
+#include <cmath>
+
+// --- Static semantic transform parameters (defaults) ---
+// Tuned for BLIP2 ITM scores which empirically max out around 0.55
+double ValueMap2D::low_thresh    = 0.2;   // below → penalty
+double ValueMap2D::high_thresh   = 0.3;  // above → bonus
+double ValueMap2D::penalty_scale = 4.0;   // max penalty at ITM=0
+double ValueMap2D::bonus_scale   = 3.0;   // max bonus at ITM=sat_score
+double ValueMap2D::sat_score     = 0.6;   // effective saturation point
+
+double ValueMap2D::transformITMScore(double itm_score)
+{
+  if (itm_score < low_thresh) {
+    // Penalty zone: magnitude grows quadratically as score decreases
+    // t ∈ [0, 1]  where 0 = at low_thresh, 1 = at ITM=0
+    double t = (low_thresh - itm_score) / low_thresh;
+    return -penalty_scale * t * t;
+  }
+  else if (itm_score > high_thresh) {
+    // Bonus zone: magnitude grows quadratically as score increases
+    // Normalized by (sat_score - high_thresh) so ITM=0.55 gets meaningful bonus
+    // t ∈ [0, 1]  where 0 = at high_thresh, 1 = at ITM=sat_score
+    // Clamp t ≤ 1 so scores beyond sat_score don't explode
+    double t = (itm_score - high_thresh) / (sat_score - high_thresh);
+    if (t > 1.0) t = 1.0;
+    return bonus_scale * t * t;
+  }
+  else {
+    // Ambiguous zone [low_thresh, high_thresh]: slight linear ramp
+    double mid = (low_thresh + high_thresh) / 2.0;
+    double half_range = (high_thresh - low_thresh) / 2.0;
+    return 0.05 * (itm_score - mid) / half_range;
+  }
+}
 
 ValueMap2D::ValueMap2D(GridMap::Ptr grid_map)
 {
@@ -59,6 +93,7 @@ void ValueMap2D::ensureInitialized()
     // Resize and reset buffers
     value_buffer_ = vector<double>(voxel_num_, 0.0);
     confidence_buffer_ = vector<double>(voxel_num_, 0.0);
+    itm_buffer_ = vector<double>(voxel_num_,0.0);
     initialized_ = true;
 
     ROS_INFO("[ValueMap2D] Initialized: %dx%d, origin=(%.2f,%.2f), res=%.3f",
@@ -81,7 +116,9 @@ void ValueMap2D::updateValueMap(const Vector2d& sensor_pos, const double& sensor
 
     // Calculate FOV-based confidence for current observation
     double now_confidence = getFovConfidence(sensor_pos, sensor_yaw, pos);
-    double now_value = itm_score;
+    // Transform raw ITM → signed semantic contribution (penalty/bonus)
+    double now_value = transformITMScore(itm_score);
+    itm_buffer_[adr] = itm_score;
 
     // Retrieve existing confidence and value
     double last_confidence = confidence_buffer_[adr];
@@ -182,7 +219,7 @@ void ValueMap2D::getFreeGrids(vector<Vector2i>& free_grids,
 
       while (cx != x || cy != y) {
         int e2 = 2 * err;
-        int prev_cx = cx, prev_cy = cy;
+        //int prev_cx = cx, prev_cy = cy;
         if (e2 > -dy) { err -= dy; cx += sx; }
         if (e2 < dx)  { err += dx; cy += sy; }
         // Skip the starting cell and the target cell itself

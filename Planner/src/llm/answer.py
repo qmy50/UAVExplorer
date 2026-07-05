@@ -19,6 +19,10 @@ def get_answer(client, prompt=None):
     else:
         respond = []
 
+    if not respond or not isinstance(respond, str):
+        print(f"[LLM] No valid response (type={type(respond).__name__}), returning empty")
+        return [], respond
+
     similar_answer = only_answer(respond)
     if similar_answer is None:
         print(f"[LLM] Failed to parse answer from response: {str(respond)[:200]}...")

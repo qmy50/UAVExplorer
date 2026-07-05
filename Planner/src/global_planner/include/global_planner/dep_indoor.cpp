@@ -5,6 +5,7 @@
 */
 
 #include <global_planner/dep.h>
+#include <algorithm>
 #include <random>
 #include <visualization_msgs/MarkerArray.h>
 #include <opencv2/opencv.hpp>
@@ -28,6 +29,8 @@ namespace globalPlanner{
 		map_ = map;
 		// 在 map_ 有效后再创建 ValueMap2D，避免传入空指针
 		value_map_.reset(new ValueMap2D(map_));
+		value_map_->ClearBuffer();
+		map_->setUse8NeighborFrontier(this->use_8neighbor_frontier_);
 		ROS_INFO("[DEP]: ValueMap2D created with valid GridMap");
 	}
 
@@ -137,7 +140,52 @@ namespace globalPlanner{
 		}
 		else{
 			cout << this->hint_ << ": Frontier sample Thresh: " << this->frontierSampleThresh_ << endl;
-		}		
+		}
+
+		// BFS+PCA frontier cluster size threshold (world meters)
+		if (not this->nh_.getParam(this->ns_ + "/cluster_size_xy", this->cluster_size_xy_)){
+			this->cluster_size_xy_ = 1.0;
+			cout << this->hint_ << ": No cluster_size_xy param. Use default: 2.0" << endl;
+		}
+		else{
+			cout << this->hint_ << ": Cluster size XY: " << this->cluster_size_xy_ << endl;
+		}
+
+		// Minimum frontier cluster cells
+		if (not this->nh_.getParam(this->ns_ + "/min_cluster_cells", this->min_cluster_cells_)){
+			this->min_cluster_cells_ = 5;
+			cout << this->hint_ << ": No min_cluster_cells param. Use default: 5" << endl;
+		}
+		else{
+			cout << this->hint_ << ": Min cluster cells: " << this->min_cluster_cells_ << endl;
+		}
+
+		// Minimum frontier size (meters) to report
+		if (not this->nh_.getParam(this->ns_ + "/min_frontier_size", this->min_frontier_size_)){
+			this->min_frontier_size_ = 0.3;
+			cout << this->hint_ << ": No min_frontier_size param. Use default: 0.3" << endl;
+		}
+		else{
+			cout << this->hint_ << ": Min frontier size: " << this->min_frontier_size_ << endl;
+		}
+
+		// Minimum distance between frontier centers (meters)
+		if (not this->nh_.getParam(this->ns_ + "/min_frontier_center_dist", this->min_frontier_center_dist_)){
+			this->min_frontier_center_dist_ = 0.4;
+			cout << this->hint_ << ": No min_frontier_center_dist param. Use default: 0.4" << endl;
+		}
+		else{
+			cout << this->hint_ << ": Min frontier center distance: " << this->min_frontier_center_dist_ << endl;
+		}
+
+		// 8邻域 frontier 检测开关
+		if (not this->nh_.getParam(this->ns_ + "/use_8neighbor_frontier", this->use_8neighbor_frontier_)){
+			this->use_8neighbor_frontier_ = false;
+			cout << this->hint_ << ": No use_8neighbor_frontier param. Use default: false (4-neighbor)" << endl;
+		}
+		else{
+			cout << this->hint_ << ": Use 8-neighbor frontier: " << (this->use_8neighbor_frontier_ ? "true" : "false") << endl;
+		}
 
 		// minimum distance for node sampling
 		if (not this->nh_.getParam(this->ns_ + "/dist_thresh", this->distThresh_)){
@@ -285,11 +333,20 @@ namespace globalPlanner{
 
 		// yaw penalty weight
 		if (not this->nh_.getParam(this->ns_ + "/yaw_penalty_weight", this->yawPenaltyWeight_)){
-			this->yawPenaltyWeight_ = 1.0;
+			this->yawPenaltyWeight_ = 2000.0;
 			cout << this->hint_ << ": No yaw penalty weight param. Use default: 1.0." << endl;
 		}
 		else{
 			cout << this->hint_ << ": Yaw penalty weight is set to: " << this->yawPenaltyWeight_ << endl;
+		}
+
+		// yaw distance scale factor (yaw penalty scales with path length)
+		if (not this->nh_.getParam(this->ns_ + "/yaw_dist_scale", this->yawDistScale_)){
+			this->yawDistScale_ = 2.0;
+			cout << this->hint_ << ": No yaw_dist_scale param. Use default: 3.0m." << endl;
+		}
+		else{
+			cout << this->hint_ << ": Yaw dist scale is set to: " << this->yawDistScale_ << endl;
 		}
 
 		// exploration 相关
@@ -298,8 +355,8 @@ namespace globalPlanner{
 		// height layers for PRM node Z sampling (indoor multi-level)
 		std::vector<double> heightLayersTemp;
 		if (not this->nh_.getParam(this->ns_ + "/height_layers", heightLayersTemp)){
-			this->height_layers_ = {1.3, 1.7};
-			cout << this->hint_ << ": No height_layers param. Use default: [1.5, 1.8]" << endl;
+			this->height_layers_ = {0.5};
+			cout << this->hint_ << ": No height_layers param. Use default: [0.5]" << endl;
 		}
 		else{
 			this->height_layers_ = heightLayersTemp;
@@ -329,12 +386,82 @@ namespace globalPlanner{
 			cout << this->hint_ << ": Use value map: " << this->useValueMap_ << endl;
 		}
 		if (not this->nh_.getParam(this->ns_ + "/semantic_weight", this->semanticWeight_)){
-			this->semanticWeight_ = 4000.0;
+			this->semanticWeight_ = 7.0;
 			cout << this->hint_ << ": No semantic_weight param. Use default: 1.0" << endl;
 		}
 		else{
 			cout << this->hint_ << ": Semantic weight: " << this->semanticWeight_ << endl;
 		}
+		if (not this->nh_.getParam(this->ns_ + "/candidate_semantic_weight", this->candidateSemanticWeight_)){
+			this->candidateSemanticWeight_ = 1.0;
+			cout << this->hint_ << ": No candidate_semantic_weight param. Use default: 1.0" << endl;
+		}
+		else{
+			cout << this->hint_ << ": Candidate semantic weight: " << this->candidateSemanticWeight_ << endl;
+		}
+		if (not this->nh_.getParam(this->ns_ + "/semantic_bypass_thresh", this->semanticBypassThresh_)){
+			this->semanticBypassThresh_ = 0.1;
+			cout << this->hint_ << ": No semantic_bypass_thresh param. Use default: 0.1" << endl;
+		}
+		else{
+			cout << this->hint_ << ": Semantic bypass threshold: " << this->semanticBypassThresh_ << endl;
+		}
+
+		// frontier bonus parameters
+		if (not this->nh_.getParam(this->ns_ + "/frontier_weight", this->frontierWeight_)){
+			this->frontierWeight_ = 0.0;
+			cout << this->hint_ << ": No frontier_weight param. Use default: 0.0" << endl;
+		}
+		else{
+			cout << this->hint_ << ": Frontier weight: " << this->frontierWeight_ << endl;
+		}
+		if (not this->nh_.getParam(this->ns_ + "/candidate_frontier_weight", this->candidateFrontierWeight_)){
+			this->candidateFrontierWeight_ = 0.5;
+			cout << this->hint_ << ": No candidate_frontier_weight param. Use default: 0.0" << endl;
+		}
+		else{
+			cout << this->hint_ << ": Candidate frontier weight: " << this->candidateFrontierWeight_ << endl;
+		}
+		if (not this->nh_.getParam(this->ns_ + "/frontier_bonus_radius", this->frontierBonusRadius_)){
+			this->frontierBonusRadius_ = 0.5;
+			cout << this->hint_ << ": No frontier_bonus_radius param. Use default: 0.5m" << endl;
+		}
+		else{
+			cout << this->hint_ << ": Frontier bonus radius: " << this->frontierBonusRadius_ << "m" << endl;
+		}
+
+		// dynamic distance penalty (ramps down with planning cycles)
+		if (not this->nh_.getParam(this->ns_ + "/dist_penalty_max", this->distPenaltyMax_)){
+			this->distPenaltyMax_ = 20.0;
+			cout << this->hint_ << ": No dist_penalty_max param. Use default: 15.0" << endl;
+		}
+		else{
+			cout << this->hint_ << ": dist_penalty_max: " << this->distPenaltyMax_ << endl;
+		}
+		if (not this->nh_.getParam(this->ns_ + "/dist_penalty_min", this->distPenaltyMin_)){
+			this->distPenaltyMin_ = 1.0;
+			cout << this->hint_ << ": No dist_penalty_min param. Use default: 3.0" << endl;
+		}
+		else{
+			cout << this->hint_ << ": dist_penalty_min: " << this->distPenaltyMin_ << endl;
+		}
+		if (not this->nh_.getParam(this->ns_ + "/dist_penalty_ramp_cycles", this->distPenaltyRampCycles_)){
+			this->distPenaltyRampCycles_ = 20;
+			cout << this->hint_ << ": No dist_penalty_ramp_cycles param. Use default: 50" << endl;
+		}
+		else{
+			cout << this->hint_ << ": dist_penalty_ramp_cycles: " << this->distPenaltyRampCycles_ << endl;
+		}
+
+		// Initial yaw change threshold to trigger replan (degrees, converted to rad)
+		double yaw_replan_deg = 90.0;
+		if (not this->nh_.getParam(this->ns_ + "/yaw_replan_threshold_deg", yaw_replan_deg)){
+			cout << this->hint_ << ": No yaw_replan_threshold_deg param. Use default: 90.0 deg" << endl;
+		}
+		else{
+			cout << this->hint_ << ": yaw_replan_threshold_deg: " << yaw_replan_deg << endl;
+		}
+		this->yaw_replan_threshold_ = yaw_replan_deg * M_PI / 180.0;
 	}
 
 	void DEP::initModules(){
@@ -357,7 +484,7 @@ namespace globalPlanner{
 		this->frontierVisPub_ = this->nh_.advertise<visualization_msgs::MarkerArray>("/dep/frontier_regions", 10);
 
 		// value map heatmap publisher (OccupancyGrid for RViz)
-		this->valueMapPub_ = this->nh_.advertise<nav_msgs::OccupancyGrid>("/dep/value_map", 10);
+		this->valueMapPub_ = this->nh_.advertise<nav_msgs::OccupancyGrid>("/dep/value_map", 10, true);  // latched: 切 episode 时自动清 RViz
 	}
 
 	void DEP::registerCallback(){
@@ -368,7 +495,7 @@ namespace globalPlanner{
 		this->visTimer_ = this->nh_.createTimer(ros::Duration(0.1), &DEP::visCB, this);
 
 		// valuemap timer
-		this->valuemapTimer_ = this->nh_.createTimer(ros::Duration(1),&DEP::valuemapCB,this);
+		this->valuemapTimer_ = this->nh_.createTimer(ros::Duration(0.5),&DEP::valuemapCB,this);
 
 		// BLIP2 ITM score subscriber (from blip2_itm_node.py)
 		this->itmScoreSub_ = this->nh_.subscribe<std_msgs::Float64>(
@@ -449,16 +576,16 @@ namespace globalPlanner{
 		// cout << "finish candidate path with size: " << this->candidatePaths_.size() << endl;
 		if (!findCandidatePathSuccess){
 			// cout << "Find candidate paths fails. need generate more samples." << endl;
-			ROS_WARN("Can not get best path: prmNodeVec_=%zu, roadmap_size=%d, goalCandidates=%zu, position=(%.2f,%.2f,%.2f), height_layer=%d",
-			         this->prmNodeVec_.size(), this->roadmap_->getSize(), this->goalCandidates_.size(),
-			         this->position_(0), this->position_(1), this->position_(2),
-			         this->current_height_layer_idx_);
+			// ROS_WARN("Can not get best path: prmNodeVec_=%zu, roadmap_size=%d, goalCandidates=%zu, position=(%.2f,%.2f,%.2f), height_layer=%d",
+			//          this->prmNodeVec_.size(), this->roadmap_->getSize(), this->goalCandidates_.size(),
+			//          this->position_(0), this->position_(1), this->position_(2),
+			//          this->current_height_layer_idx_);
 			// Print each goal candidate position with its numVoxels and adjNodes for diagnosis
-			for (size_t i = 0; i < this->goalCandidates_.size(); ++i) {
-				auto& gc = this->goalCandidates_[i];
-				ROS_WARN("[DEP] goalCandidates_[%zu]: pos=(%.2f,%.2f,%.2f) numVoxels=%d adjNodes=%zu",
-				         i, gc->pos(0), gc->pos(1), gc->pos(2), gc->numVoxels, gc->adjNodes.size());
-			}
+			// for (size_t i = 0; i < this->goalCandidates_.size(); ++i) {
+			// 	auto& gc = this->goalCandidates_[i];
+			// 	// ROS_WARN("[DEP] goalCandidates_[%zu]: pos=(%.2f,%.2f,%.2f) numVoxels=%d adjNodes=%zu",
+			// 	//          i, gc->pos(0), gc->pos(1), gc->pos(2), gc->numVoxels, gc->adjNodes.size());
+			// }
 			// Check if start PRM node has any adjNodes
 			std::shared_ptr<PRM::Node> currPos;
 			currPos.reset(new PRM::Node(this->position_));
@@ -479,6 +606,15 @@ namespace globalPlanner{
 			ROS_WARN("findBestPath produced empty bestPath, returning false");
 			return false;
 		}
+		// Compute initial yaw change: angle between current heading and first path segment
+		if (this->bestPath_.size() >= 2) {
+			Eigen::Vector3d first_seg = this->bestPath_[1]->pos - this->bestPath_[0]->pos;
+			double first_seg_yaw = atan2(first_seg(1), first_seg(0));
+			this->initial_yaw_change_ = fabs(globalPlanner::angleDiff(this->currYaw_, first_seg_yaw));
+		} else {
+			this->initial_yaw_change_ = 0.0;
+		}
+		depPlanCount_++;
 		return true;
 	}
 
@@ -699,83 +835,28 @@ namespace globalPlanner{
 	}
 
 	void DEP::detectFrontierRegion(std::vector<std::pair<Eigen::Vector3d, double>>& frontierPointPairs) {
-    	// frontierPointPairs.clear();
+		frontierPointPairs.clear();
 
-		// if (use2DMap_ && map_->is2DMapReady()) {
-		// 	const auto& grid = map_->get2DOccupancyGrid();
-			
-		// 	double gridOriginX = grid.info.origin.position.x;
-		// 	double gridOriginY = grid.info.origin.position.y;
-		// 	double res = this->map_->getRes();
-			
-		// 	// 已探索区域范围（世界坐标）
-		// 	Eigen::Vector3d mapMin, mapMax;
-		// 	this->map_->getCurrMapRange(mapMin, mapMax);
+		if (!use2DMap_ || !map_->is2DMapReady()) {
+			ROS_WARN_THROTTLE(5.0, "[DEP] 2D map not ready for frontier detection");
+			return;
+		}
 
-		// 	// 计算已探索区域在图像中的像素范围
-		// 	// 注意：cv::Mat 的 row 0 对应 grid data 的 y=0（即世界坐标最小的 y，在图像顶部）
-		// 	int roi_x = max(0, int(floor((mapMin(0) - gridOriginX) / res)));
-		// 	int roi_y = max(0, int(floor((mapMin(1) - gridOriginY) / res)));
-		// 	int roi_x_end = min(int(grid.info.width) - 1, int(floor((mapMax(0) - gridOriginX) / res)));
-		// 	int roi_y_end = min(int(grid.info.height) - 1, int(floor((mapMax(1) - gridOriginY) / res)));
+		double z_height = this->height_layers_[0];
+		if (!height_layers_.empty()) {
+			int idx = std::max(0, std::min(current_height_layer_idx_, (int)height_layers_.size() - 1));
+			z_height = height_layers_[idx];
+		}
 
-		// 	// 【关键修复】创建二值图像：未知区域=255(白), 其他=0(黑)
-		// 	// 只在已探索区域附近标记未知像素，远离已探索区域的未知区域不算前沿
-		// 	cv::Mat im(grid.info.height, grid.info.width, CV_8UC1, cv::Scalar(0));
-		// 	for (int y = roi_y; y <= roi_y_end; ++y) {
-		// 		for (int x = roi_x; x <= roi_x_end; ++x) {
-		// 			int idx = y * grid.info.width + x;
-		// 			if (grid.data[idx] == -1)  // unknown
-		// 				im.data[idx] = 255;
-		// 		}
-		// 	}
+		map_->detectFrontierClusters(frontierPointPairs, z_height,
+		                             cluster_size_xy_,
+		                             min_cluster_cells_,
+		                             min_frontier_size_,
+		                             min_frontier_center_dist_);
 
-		// 	cv::SimpleBlobDetector::Params params;
-		// 	params.filterByColor = true;
-		// 	params.blobColor = 255;  // 检测白色 blob（即未知区域）
-		// 	params.filterByArea = true;
-		// 	params.minArea = pow(0.5 / res, 2);
-		// 	params.maxArea = 0.3*grid.info.width * grid.info.height;
-		// 	params.filterByCircularity = false;
-		// 	params.filterByConvexity = false;
-		// 	// 阈值范围：从高到低扫描，让值=255的未知区域在各阈值下都是前景
-		// 	params.minThreshold = 200;
-		// 	params.maxThreshold = 255;
-		// 	params.thresholdStep = 10;
-		// 	cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(params);
-
-		// 	double h = this->position_(2);
-		// 	h = std::max(this->globalRegionMin_(2), std::min(h, this->globalRegionMax_(2)));
-
-		// 	std::vector<cv::KeyPoint> keypoints;
-		// 	detector->detect(im, keypoints);
-
-		// 	for (const auto& kp : keypoints) {
-		// 		Eigen::Vector3d p(gridOriginX + kp.pt.x * res,
-		// 						gridOriginY + kp.pt.y * res,
-		// 						h);
-		// 		double dist = kp.size * res;
-		// 		frontierPointPairs.push_back({p, dist});
-		// 	}
-
-		// 	// 可视化：显示原始三值图 + 检测框 + 检测结果
-		// 	// cv::Mat im_vis(grid.info.height, grid.info.width, CV_8UC1);
-		// 	// for (size_t i = 0; i < grid.data.size(); ++i) {
-		// 	// 	if (grid.data[i] == -1) im_vis.data[i] = 50;
-		// 	// 	else if (grid.data[i] == 0) im_vis.data[i] = 255;
-		// 	// 	else im_vis.data[i] = 0;
-		// 	// }
-		// 	// 在可视化图上画矩形框标示已探索区域范围
-		// 	// cv::Rect roi_rect(roi_x, roi_y, roi_x_end - roi_x + 1, roi_y_end - roi_y + 1);
-		// 	// cv::rectangle(im_vis, roi_rect, cv::Scalar(128), 2);
-		// 	// cv::Mat im_with_keypoints;
-		// 	// cv::drawKeypoints(im_vis, keypoints, im_with_keypoints, cv::Scalar(0, 0, 255),
-		// 	// 				cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-		// 	// cv::imshow("Frontier Blob Detection", im_with_keypoints);
-		// 	// cv::waitKey(1);
-		// } else {
-		// 	ROS_ERROR("2D map not ready for blob detection!");
-		// }
+		ROS_INFO_COND(!frontierPointPairs.empty(),
+		              "[DEP] Detected %zu frontier clusters at z=%.1f",
+		              frontierPointPairs.size(), z_height);
 	}
 
 
@@ -793,58 +874,65 @@ namespace globalPlanner{
 		std::vector<double> sampleWeights;
 		for (int i=0; i<int(this->frontierPointPairs_.size()); ++i){
 			double size = this->frontierPointPairs_[i].second;
-			sampleWeights.push_back(pow(size, 2));
+			//sampleWeights.push_back(pow(size, 2));
+			sampleWeights.push_back(1.0);
 		}
 		int countFrontierFailure = 0;
-		// while (ros::ok() and countFrontierFailure < this->frontierSampleThresh_ and sampleWeights.size() != 0){
-		// 	std::shared_ptr<PRM::Node> fn = this->sampleFrontierPoint(sampleWeights);
-		// 	// a. find N nearest neighbors
-		// 	std::vector<std::shared_ptr<PRM::Node>> fnNeighbors = this->roadmap_->kNearestNeighbor(fn, this->nnNumFrontier_);
-		// 	//ROS_WARN("Build from frontier map");
-		// 	// b. for each neighbor extend them and check the validity
-		// 	if (int(fnNeighbors.size()) > 0){
-		// 		int countSampleOnce = 0;
-		// 		for (std::shared_ptr<PRM::Node> fnNN : fnNeighbors){
-		// 			n = this->extendNode(fnNN, fn);
-		// 			bool is2DFreeValid = false;
-		// 			if (use2DMap_ && map_->is2DMapReady()) {
-		// 				is2DFreeValid = true;
-		// 				for (double x = n->pos(0) - this->safeDistXY_; x <= n->pos(0) + this->safeDistXY_; x += map_->getRes()) {
-		// 					for (double y = n->pos(1) - this->safeDistXY_; y <= n->pos(1) + this->safeDistXY_; y += map_->getRes()) {
-		// 						if (!map_->is2DFree(x, y)) {
-		// 							is2DFreeValid = false;
-		// 							break;
-		// 						}
-		// 					}
-		// 					if (!is2DFreeValid) break;
-		// 				}
-		// 			}
-		// 			if (is2DFreeValid){
-		// 			// if (this->isPosValid(n->pos, this->safeDistXY_, this->safeDistZ_)){
-		// 				std::shared_ptr<PRM::Node> nn = this->roadmap_->nearestNeighbor(n);
-		// 				double distToNN = (n->pos - nn->pos).norm();
-		// 				if (distToNN >= this->distThresh_){
-		// 					this->roadmap_->insert(n);
-		// 					newNodes.push_back(n);
-		// 					// this->prmNodeVec_.push_back(n);
-		// 					this->prmNodeVec_.insert(n);
-		// 					++countSample;	
-		// 					++countSampleOnce;
-		// 				}
-		// 			}
-		// 		}
-		// 		if (countSampleOnce == 0){
-		// 			++countFrontierFailure;
-		// 		}
+		while (ros::ok() and countFrontierFailure < this->frontierSampleThresh_
+			       and sampleWeights.size() != 0
+			       and this->roadmap_->getSize() > 0){   // roadmap 为空则跳过，等 local/global 先建图
+			// if(countSample >= 50){
+			// 	break;
+			// }
+			std::shared_ptr<PRM::Node> fn = this->sampleFrontierPoint(sampleWeights);
+			// a. find N nearest neighbors
+			std::vector<std::shared_ptr<PRM::Node>> fnNeighbors = this->roadmap_->kNearestNeighbor(fn, this->nnNumFrontier_);
+			//ROS_WARN("Build from frontier map");
+			// b. for each neighbor extend them and check the validity
+			if (int(fnNeighbors.size()) > 0){
+				int countSampleOnce = 0;
+				for (std::shared_ptr<PRM::Node> fnNN : fnNeighbors){
+					n = this->extendNode(fnNN, fn);
+					bool is2DFreeValid = false;
+					if (use2DMap_ && map_->is2DMapReady()) {
+						is2DFreeValid = true;
+						for (double x = n->pos(0) - this->safeDistXY_; x <= n->pos(0) + this->safeDistXY_; x += map_->getRes()) {
+							for (double y = n->pos(1) - this->safeDistXY_; y <= n->pos(1) + this->safeDistXY_; y += map_->getRes()) {
+								if (!map_->is2DFree(x, y)) {
+									is2DFreeValid = false;
+									break;
+								}
+							}
+							if (!is2DFreeValid) break;
+						}
+					}
+					if (is2DFreeValid){
+					// if (this->isPosValid(n->pos, this->safeDistXY_, this->safeDistZ_)){
+						std::shared_ptr<PRM::Node> nn = this->roadmap_->nearestNeighbor(n);
+						double distToNN = (n->pos - nn->pos).norm();
+						if (distToNN >= this->distThresh_){
+							this->roadmap_->insert(n);
+							newNodes.push_back(n);
+							// this->prmNodeVec_.push_back(n);
+							this->prmNodeVec_.insert(n);
+							++countSample;	
+							++countSampleOnce;
+						}
+					}
+				}
+				if (countSampleOnce == 0){
+					++countFrontierFailure;
+				}
 
-		// 	}
-		// 	else{ // not enough neighbor
-		// 		break;
-		// 	}
-		// }
-		// cout << "added sample from frontier:  " << countSample << endl;
-
+			}
+			else{ // 该采样点附近无 roadmap 节点 → 换一个 frontier 重试
+				++countFrontierFailure;
+			}
+		}
+		cout << "added sample from frontier:  " << countSample << endl;
+		//ROS_WARN("Frontier sample thresh is %d",this->frontierSampleThresh_);
 		while (ros::ok() and not saturate){
+			//ROS_WARN("Let us try another sample");
 			if (regionSaturate){
 				// If just switched layer, skip global sampling to focus on
 				// local escape: only build roadmap around current position
@@ -861,6 +949,7 @@ namespace globalPlanner{
 						saturate = true;
 						break;
 					}
+					//ROS_WARN("Count failure global:%d",countFailureGlobal);
 					n = this->randomConfigBBox(this->globalRegionMin_, this->globalRegionMax_);
 					// Check how close new node is other nodes
 					double distToNN;
@@ -889,6 +978,7 @@ namespace globalPlanner{
 					// Generate new node
 					while (ros::ok() and true){
 						//cout << "failure number: " << countFailureLocal << endl;
+						//ROS_WARN("Count failure local:%d",countFailureLocal);
 						if (countFailureLocal > this->localSampleThresh_){
 							regionSaturate = true;
 							break;
@@ -897,8 +987,6 @@ namespace globalPlanner{
 						Eigen::Vector3d localSampleMax = this->position_+this->localRegionMax_;
 						n = this->randomConfigBBox(localSampleMin, localSampleMax);
 						// Local sampling: only accept samples in KNOWN FREE space
-						// (isPosValid allows unknown, but we don't want to build PRM nodes
-						//  in unknown areas where obstacles may exist)
 						if (use2DMap_ && map_->is2DMapReady()) {
 							if (!map_->is2DFree(n->pos(0), n->pos(1))) {
 								++countFailureLocal;
@@ -994,14 +1082,15 @@ namespace globalPlanner{
 
 	void DEP::updateInformationGain(){
 		// iterate through all current nodes (ignore update by path now)
-		// two types of nodes need update:
+		// three types of nodes need update:
 		// 1. new nodes
 		// 2. nodes close to the historical trajectory
+		// 3. nodes along the last executed bestPath (robot just followed this path)
 		std::unordered_set<std::shared_ptr<PRM::Node>> updateSet;
 		for (std::shared_ptr<PRM::Node> n : this->prmNodeVec_){ // new nodes
 			if (n->newNode == true){// 1. new nodes
 				updateSet.insert(n);
-			}	
+			}
 		}
 
 		for (Eigen::Vector3d& histPos : this->histTraj_){ // traj update nodes
@@ -1010,6 +1099,17 @@ namespace globalPlanner{
 			std::vector<std::shared_ptr<PRM::Node>> nns = this->roadmap_->kNearestNeighbor(histN, 10);
 			for (std::shared_ptr<PRM::Node>& nn : nns){
 				if ((nn->pos - histN->pos).norm() <= this->updateDist_){
+					updateSet.insert(nn);
+				}
+			}
+		}
+
+		// 3. nodes along the last bestPath — the robot just traversed this area,
+		//    so unknown voxels around these nodes must have decreased significantly
+		for (std::shared_ptr<PRM::Node>& pathNode : this->bestPath_){
+			std::vector<std::shared_ptr<PRM::Node>> nns = this->roadmap_->kNearestNeighbor(pathNode, 5);
+			for (std::shared_ptr<PRM::Node>& nn : nns){
+				if ((nn->pos - pathNode->pos).norm() <= this->updateDist_){
 					updateSet.insert(nn);
 				}
 			}
@@ -1025,9 +1125,20 @@ namespace globalPlanner{
 		this->histTraj_.clear(); // clear history
 	}
 
+	double DEP::getFrontierProximity(const Eigen::Vector3d& pos) const {
+		if (frontierPointPairs_.empty()) return 0.0;
+		double minDist = std::numeric_limits<double>::max();
+		for (const auto& fp : frontierPointPairs_) {
+			double d = (Eigen::Vector2d(pos.x(), pos.y()) -
+			            Eigen::Vector2d(fp.first.x(), fp.first.y())).norm();
+			if (d < minDist) minDist = d;
+		}
+		if (minDist >= frontierBonusRadius_) return 0.0;
+		return 1.0 - minDist / frontierBonusRadius_;
+	}
+
 	void DEP::getBestViewCandidates(std::vector<std::shared_ptr<PRM::Node>>& goalCandidates){
 		goalCandidates.clear();
-		bool firstNode = true;
 		std::priority_queue<std::shared_ptr<PRM::Node>, std::vector<std::shared_ptr<PRM::Node>>, PRM::GainCompareNode> gainPQ;
 
 		// iterate through all points in the roadmap
@@ -1035,64 +1146,127 @@ namespace globalPlanner{
 			gainPQ.push(n);
 		}
 
-		// select candidates from the priority queue
+		// ── Phase 1: Low gain threshold（只过滤已完全探索的区域）──
+		int poolSize = std::min(this->maxCandidateNum_ * 3, 100);
+		std::vector<std::shared_ptr<PRM::Node>> candidatePool;
+
 		int maxNumVoxel = 0;
 		while (ros::ok()){
-			if (gainPQ.size() == 0){
-				break;
-			}
-
+			if (gainPQ.size() == 0) break;
 
 			std::shared_ptr<PRM::Node> n = gainPQ.top();
-			
-			if (firstNode){
-				// if ((n->pos - this->position_).norm() >= 1.0){
-				if ((n->pos - this->position_).norm() >= 0.0){
-					maxNumVoxel = n->numVoxels;
-					firstNode = false;
+
+			if (maxNumVoxel == 0) maxNumVoxel = n->numVoxels;
+
+			// 只过滤 gain < 10% maxGain（基本完全探索完的），保留语义作用空间
+			if (double(n->numVoxels) < double(maxNumVoxel) *0.2) break;
+
+			gainPQ.pop();
+
+			if ((n->pos - this->position_).norm() >= 0.0){
+				if (this->isPosValid(n->pos, this->safeDistXY_, this->safeDistZ_)){
+					candidatePool.push_back(n);
 				}
 			}
 
-			if (double(n->numVoxels) < double(maxNumVoxel) * this->minVoxelThresh_){
-				break;
-			}
-			// if ((n->pos - this->position_).norm() >= 1.0){
-			if ((n->pos - this->position_).norm() >= 0.0){			
-				if (this->isPosValid(n->pos, this->safeDistXY_, this->safeDistZ_)){
-					goalCandidates.push_back(n);
-					// cout << "Valid goal candidate: " << n->pos.transpose() << " voxel: " << n->numVoxels  << endl;
-				}
-			}
+			if (int(candidatePool.size()) >= poolSize) break;
+		}
+
+		// Fill remaining slots if pool too small
+		while (int(candidatePool.size()) < this->minCandidateNum_ && gainPQ.size() > 0
+		       && int(candidatePool.size()) < poolSize) {
+			std::shared_ptr<PRM::Node> n = gainPQ.top();
 			gainPQ.pop();
-			
-			if (int(goalCandidates.size()) >= this->maxCandidateNum_){
-				break;
+			if ((n->pos - this->position_).norm() >= 0.0){
+				if (this->isPosValid(n->pos, this->safeDistXY_, this->safeDistZ_)){
+					candidatePool.push_back(n);
+				}
 			}
 		}
 
-		// cout << "current pos: " << this->position_.transpose() << endl;
-		while (int(goalCandidates.size()) < this->minCandidateNum_){
-			if (gainPQ.size() == 0){
-				break;
+		// // ── Semantic bypass: high-value nodes skip the gain filter ──
+		// if (useValueMap_ && value_map_ && value_map_->isInitialized()
+		//     && semanticBypassThresh_ > 0 && int(candidatePool.size()) < poolSize) {
+		// 	std::unordered_set<std::shared_ptr<PRM::Node>> inPool(
+		// 		candidatePool.begin(), candidatePool.end());
+		// 	for (const auto& n : this->prmNodeVec_) {
+		// 		if (inPool.count(n)) continue;
+		// 		Eigen::Vector2d pos2d(n->pos(0), n->pos(1));
+		// 		if (value_map_->getValue(pos2d) > semanticBypassThresh_) {
+		// 			if ((n->pos - this->position_).norm() >= 0.0 &&
+		// 			    this->isPosValid(n->pos, this->safeDistXY_, this->safeDistZ_)) {
+		// 				candidatePool.push_back(n);
+		// 				ROS_WARN("[DEP] Semantic bypass: value=%.3f at (%.1f,%.1f), gain=%d",
+		// 				         value_map_->getValue(pos2d), n->pos(0), n->pos(1), n->numVoxels);
+		// 				if (int(candidatePool.size()) >= poolSize) break;
+		// 			}
+		// 		}
+		// 	}
+		// }
+
+		// ── Phase 2: Re-rank by combined score (info gain + semantic value + frontier) ──
+		if (useValueMap_ && value_map_ && value_map_->isInitialized()
+		    && candidateSemanticWeight_ > 1e-6 && candidatePool.size() > 1)
+		{
+			// Normalize info gain to [0, 1] within the pool for fair combination
+			double maxGain = candidatePool.front()->numVoxels;
+			double minGain = candidatePool.back()->numVoxels;
+			double gainRange = (maxGain - minGain > 1e-6) ? (maxGain - minGain) : 1.0;
+
+			// 使用 transformITMScore 的理论范围 [-penalty_scale, bonus_scale] = [-4, 3] 做归一化
+			// 避免未观测节点(raw=0)在全是penalty的候选池中被推到 norm=1.0
+			double semMin = -ValueMap2D::penalty_scale;  // -4.0
+			double semMax =  ValueMap2D::bonus_scale;     //  3.0
+			double semRange = semMax - semMin;            //  7.0
+			ROS_WARN("[DEP] Semantic range (fixed): min=%.2f max=%.2f", semMin, semMax);
+
+			// Compute combined score for each candidate
+			std::vector<std::pair<double, std::shared_ptr<PRM::Node>>> scoredCandidates;
+			scoredCandidates.reserve(candidatePool.size());
+			for (const auto& n : candidatePool){
+				double normalizedGain = (n->numVoxels - minGain) / gainRange;
+				Eigen::Vector2d pos2d(n->pos(0), n->pos(1));
+				double semanticValue = value_map_->getValue(pos2d);
+				double normalizedSemantic = 2.0 * (semanticValue - semMin) / semRange - 1.0;  // [-1, 1]
+				double frontierProximity = getFrontierProximity(n->pos);
+				// Combined score: gain (0~1) + normalized semantic (-1~1) + frontier proximity bonus (0~1)
+				double combinedScore = normalizedGain
+					+ candidateSemanticWeight_ * normalizedSemantic
+					+ candidateFrontierWeight_ * frontierProximity;
+				scoredCandidates.emplace_back(combinedScore, n);
+				ROS_WARN("The gain score is %f",normalizedGain);
+				ROS_WARN("The sematic score is %f (raw=%.2f, norm=%.2f)", candidateSemanticWeight_ * normalizedSemantic, semanticValue, normalizedSemantic);
+				ROS_WARN("The frontier score is %f",candidateFrontierWeight_ * frontierProximity);
 			}
 
-			if (int(goalCandidates.size()) >= this->maxCandidateNum_){
-				break;
+			// Sort by combined score descending
+			std::sort(scoredCandidates.begin(), scoredCandidates.end(),
+			          [](const auto& a, const auto& b) { return a.first > b.first; });
+
+			// Select top K candidates
+			for (size_t i = 0; i < scoredCandidates.size()
+			     && int(goalCandidates.size()) < this->maxCandidateNum_; ++i)
+			{
+				goalCandidates.push_back(scoredCandidates[i].second);
 			}
 
-			std::shared_ptr<PRM::Node> n = gainPQ.top();
-			gainPQ.pop();
-			// if ((n->pos - this->position_).norm() >= 1.0){ 
-			if ((n->pos - this->position_).norm() >= 0.0){	
-				// cout << "candidate goal: " << n->pos.transpose() << endl;	
-				if (this->isPosValid(n->pos, this->safeDistXY_, this->safeDistZ_)){
-					goalCandidates.push_back(n);
-					// cout << "Valid goal candidate: " << n->pos.transpose() << " voxel: " << n->numVoxels  << endl;
-				}			
+			// Fill to minCandidateNum with remaining pool entries (already in order)
+			for (size_t i = goalCandidates.size(); i < scoredCandidates.size()
+			     && int(goalCandidates.size()) < this->minCandidateNum_; ++i)
+			{
+				goalCandidates.push_back(scoredCandidates[i].second);
+			}
+		}
+		else
+		{
+			// Fallback: original info-gain-only ordering (when value map unavailable)
+			for (size_t i = 0; i < candidatePool.size()
+			     && int(goalCandidates.size()) < this->maxCandidateNum_; ++i)
+			{
+				goalCandidates.push_back(candidatePool[i]);
 			}
 		}
 	}
-
 	bool DEP::findCandidatePath(const std::vector<std::shared_ptr<PRM::Node>>& goalCandidates, std::vector<std::vector<std::shared_ptr<PRM::Node>>>& candidatePaths){
 		bool findPath = false;
 		// find nearest node of current location
@@ -1147,10 +1321,11 @@ namespace globalPlanner{
 	void DEP::findBestPath(const std::vector<std::vector<std::shared_ptr<PRM::Node>>>& candidatePaths, std::vector<std::shared_ptr<PRM::Node>>& bestPath){
 		// find path highest unknown
 		bestPath.clear();
-		double highestScore = -1;
+		goalPathFind_ = false;  // reset each planning cycle
+		double highestScore = -10000;
 		for (int n=0; n<int(candidatePaths.size()); ++n){
 			std::vector<std::shared_ptr<PRM::Node>> path = candidatePaths[n]; 
-			ROS_INFO("CandidatePath size is %d",path.size());
+			// ROS_INFO("CandidatePath size is %d",path.size());
 			if (int(path.size()) <= 1) continue;
 			if(int(path.size()) == 2){
 				if((path[0]->pos-path[1]->pos).norm() < 0.4){
@@ -1161,6 +1336,7 @@ namespace globalPlanner{
 			double prevYaw = this->currYaw_;
 			int unknownVoxel = 0;
 			bool skipPath = false;
+			double semanticValue = 0.0;  // 累积路径上所有点的语义分数
 			for (int i=0; i<int(path.size())-1; ++i){
 				std::shared_ptr<PRM::Node> currNode = path[i];
 				std::shared_ptr<PRM::Node> nextNode = path[i+1];
@@ -1184,6 +1360,12 @@ namespace globalPlanner{
 				// }
 				yawDist += angleLine;
 				prevYaw = angle;
+
+				// 累积中间节点的语义分数
+				if (useValueMap_ && value_map_ && value_map_->isInitialized()) {
+					Eigen::Vector2d pos2d(currNode->pos(0), currNode->pos(1));
+					semanticValue += 0.3*value_map_->getValue(pos2d);
+				}
 			}
 			// if(skipPath)continue;
 			// reevaluate the goal node
@@ -1196,30 +1378,31 @@ namespace globalPlanner{
 
 			double distance = this->calculatePathLength(path);
 			// cout << "total is distance is: " << distance << " total yaw distance is: " << yawDist << " voxel: " << path.back()->numVoxels << endl;
-			double pathTime = distance/this->vel_ + this->yawPenaltyWeight_ * yawDist/this->angularVel_;
+			double progress = std::min(1.0, double(depPlanCount_) / double(distPenaltyRampCycles_));
+			double dWeight = distPenaltyMax_ - progress * (distPenaltyMax_ - distPenaltyMin_);
+			double effectiveYawWeight = this->yawPenaltyWeight_ * (1.0 + distance / this->yawDistScale_);
+			double pathTime = dWeight * distance / this->vel_ + effectiveYawWeight * yawDist / this->angularVel_;
 			
-			// Semantic value bonus from ValueMap2D
-			double semanticValue = 0.0;
+			// 累积目标节点的语义分数
 			if (useValueMap_ && value_map_ && value_map_->isInitialized()) {
-				// Accumulate semantic value along the path (2D projection)
-				for (const auto& node : path) {
-					Eigen::Vector2d pos2d(node->pos(0), node->pos(1));
-					semanticValue += value_map_->getValue(pos2d);
-				}
-				// Normalize by path length to avoid bias toward longer paths
-				if (distance > 1e-3) semanticValue /= distance;
+				Eigen::Vector2d pos2d(path.back()->pos(0), path.back()->pos(1));
+				semanticValue += value_map_->getValue(pos2d);
 			}
-			
-			double score;
-			
-			if (useValueMap_ && value_map_ && value_map_->isInitialized() && semanticValue > 0.0) {
-				score = double(unknownVoxel)/pathTime + semanticWeight_ * semanticValue;
-				ROS_WARN("USE SEMANTIC");
-				ROS_INFO("Semantic value is %f",semanticWeight_ * semanticValue);
-			} else {
-				score = double(unknownVoxel)/pathTime;
+			ROS_INFO("PathTime = %f",pathTime);
+			double score = double(unknownVoxel)/pathTime;
+			ROS_INFO("Before score = %f",score);
+			// Apply semantic value / pathTime: 与 info gain 一致，都是 per-unit-time 收益
+			if (useValueMap_ && value_map_ && value_map_->isInitialized()) {
+				double sv = semanticWeight_ * semanticValue / pathTime;
+				score += sv;
+				ROS_INFO("c %.2f (raw=%.3f, /pathTime=%.3f)", sv, semanticValue, semanticValue/pathTime);
 			}
-			// ROS_INFO("Current score = %f",score);
+			// Frontier proximity bonus for the goal node
+			if (this->frontierWeight_ > 1e-6 && !frontierPointPairs_.empty()) {
+				double frontierBonus = this->frontierWeight_ * this->getFrontierProximity(path.back()->pos);
+				score += frontierBonus;
+			}
+			// score = (score + unknownVoxel)/pathTime;
 			// cout << "unknown for path: " << n <<  " is: " << unknownVoxel << " score: " << score << " distance: " << distance << " Time: " << pathTime <<  " Last total unknown: " << path.back()->numVoxels << " last best: " << path.back()->getBestYawVoxel() << endl;
 			if (score > highestScore){
 				highestScore = score;
@@ -1230,7 +1413,6 @@ namespace globalPlanner{
 			cout << "[DEP]: Current score is 0. The exploration might complete." << endl;
 		}
 	}
-
 
 	void DEP::odomCB(const nav_msgs::OdometryConstPtr& odom){
 		this->odom_ = *odom;
@@ -1418,7 +1600,7 @@ namespace globalPlanner{
 				int idx = std::max(0, std::min(this->current_height_layer_idx_, (int)this->height_layers_.size() - 1));
 				p(2) = this->height_layers_[idx];
 			} else {
-				p(2) = 1.5;  // fallback
+				p(2) = this->height_layers_[0];  // fallback
 			}
 			if (use2DMap_ && map_->is2DMapReady()) {
 				valid = map_->is2DFree(p(0), p(1));
@@ -1566,12 +1748,12 @@ namespace globalPlanner{
 		double xmax = std::min(frontierCenter(0) + frontierSize/sqrt(2), this->globalRegionMax_(0));
 		double ymin = std::max(frontierCenter(1) - frontierSize/sqrt(2), this->globalRegionMin_(1));
 		double ymax = std::min(frontierCenter(1) + frontierSize/sqrt(2), this->globalRegionMax_(1));
-		double zmin = frontierCenter(2);
-		double zmax = frontierCenter(2);
+		// double zmin = frontierCenter(2);
+		// double zmax = frontierCenter(2);
 		Eigen::Vector3d frontierPoint;
 		frontierPoint(0) = globalPlanner::randomNumber(xmin, xmax);
 		frontierPoint(1) = globalPlanner::randomNumber(ymin, ymax);
-		frontierPoint(2) = globalPlanner::randomNumber(zmin, zmax);
+		frontierPoint(2) = this->height_layers_[0];
 		std::shared_ptr<PRM::Node> frontierNode (new PRM::Node(frontierPoint));
 		return frontierNode;
 	}
@@ -1581,7 +1763,8 @@ namespace globalPlanner{
 		Eigen::Vector3d p = n->pos + (target->pos - n->pos)/(target->pos - n->pos).norm() * extendDist;
 		p(0) = std::max(this->globalRegionMin_(0), std::min(p(0), this->globalRegionMax_(0)));
 		p(1) = std::max(this->globalRegionMin_(1), std::min(p(1), this->globalRegionMax_(1)));
-		p(2) = std::max(this->globalRegionMin_(2), std::min(p(2), this->globalRegionMax_(2)));
+		//p(2) = std::max(this->globalRegionMin_(2), std::min(p(2), this->globalRegionMax_(2)));
+		p(2) = this->height_layers_[0];
 		std::shared_ptr<PRM::Node> extendedNode (new PRM::Node(p));
 		return extendedNode;
 	}
@@ -1633,7 +1816,16 @@ namespace globalPlanner{
 			voxelNumText.scale.y = 0.1;
 			voxelNumText.scale.z = 0.1;
 			voxelNumText.color.a = 1.0;
-			voxelNumText.text = std::to_string(n->numVoxels);
+			// 信息增益 + 语义增益 + 前沿增益 加权显示
+			double displayScore = static_cast<double>(n->numVoxels);
+			Eigen::Vector2d pos2d(n->pos(0), n->pos(1));
+			if (useValueMap_ && value_map_ && value_map_->isInitialized()) {
+				displayScore += semanticWeight_ * value_map_->getValue(pos2d);
+			}
+			displayScore += frontierWeight_ * getFrontierProximity(n->pos);
+			char buf[16];
+			snprintf(buf, sizeof(buf), "%.0f", displayScore);
+			voxelNumText.text = buf;
 			voxelNumText.lifetime = ros::Duration(0.5);
 			++countVoxelNumText;
 			roadmapMarkers.markers.push_back(voxelNumText);
@@ -1852,7 +2044,21 @@ namespace globalPlanner{
 	}
 
 	void DEP::publishValueMap(){
-		if (!value_map_ || !value_map_->isInitialized()) return;
+		if (!value_map_) return;
+
+		// 未初始化时发布空地图清空 RViz 残留
+		if (!value_map_->isInitialized()) {
+			nav_msgs::OccupancyGrid empty_grid;
+			empty_grid.header.frame_id = "map";
+			empty_grid.header.stamp = ros::Time::now();
+			empty_grid.info.resolution = 0.05;
+			empty_grid.info.width = 1;
+			empty_grid.info.height = 1;
+			empty_grid.info.origin.orientation.w = 1.0;
+			empty_grid.data.resize(1, -1);
+			this->valueMapPub_.publish(empty_grid);
+			return;
+		}
 
 		int w = value_map_->getWidth();
 		int h = value_map_->getHeight();
@@ -1861,7 +2067,7 @@ namespace globalPlanner{
 		double oy = value_map_->getOriginY();
 		const auto& values = value_map_->getValueBuffer();
 
-		// ---- 1. Publish as OccupancyGrid for RViz ----
+		// // ---- 1. Publish as OccupancyGrid for RViz ----
 		nav_msgs::OccupancyGrid grid;
 		grid.header.frame_id = "map";
 		grid.header.stamp = ros::Time::now();
@@ -1873,19 +2079,11 @@ namespace globalPlanner{
 		grid.info.origin.position.z = 0.0;
 		grid.info.origin.orientation.w = 1.0;
 
-		// Find min/max for normalization (skip zero-confidence cells)
-		double vmin = std::numeric_limits<double>::max();
-		double vmax = -std::numeric_limits<double>::max();
+		// 使用 transformITMScore 的理论范围作为固定色阶 (penalty_scale=-4.0, bonus_scale=3.0)
+		double vmin = -ValueMap2D::penalty_scale;  // -4.0
+		double vmax =  ValueMap2D::bonus_scale;     //  3.0
+		if (vmax - vmin < 1e-6) { vmax = vmin + 1.0; }
 		const auto& conf = value_map_->getConfidenceBuffer();
-		for (int i = 0; i < w * h; ++i) {
-			if (conf[i] > 1e-6) {
-				vmin = std::min(vmin, values[i]);
-				vmax = std::max(vmax, values[i]);
-			}
-		}
-		if (vmax - vmin < 1e-6) {
-			vmax = vmin + 1.0;  // avoid divide-by-zero
-		}
 
 		grid.data.resize(w * h, -1);  // default: unknown
 		for (int i = 0; i < w * h; ++i) {

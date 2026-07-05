@@ -45,6 +45,9 @@ public:
   /// Get confidence at grid index
   double getConfidence(const Vector2i& idx);
 
+  double getITM(const Vector2d& pos);
+  void ClearBuffer();
+
   /// Collect free grids visible from current sensor pose (within FOV, range, and line-of-sight)
   void getFreeGrids(vector<Vector2i>& free_grids,
                     const Vector2d& sensor_pos, const double& sensor_yaw);
@@ -55,6 +58,26 @@ public:
 
   /// Re-initialize buffers if 2D map size changed
   void ensureInitialized();
+
+  /**
+   * @brief Transform raw ITM score into signed semantic contribution.
+   *
+   * Mapping: low ITM (< low_thresh) → negative penalty (quadratic with distance)
+   *          high ITM (> high_thresh) → positive bonus (quadratic with distance)
+   *          mid ITM → near-zero linear ramp
+   *
+   * @param itm_score  Raw ITM cosine similarity [0, 1]
+   * @return Signed semantic contribution (negative = penalty, positive = bonus)
+   */
+  static double transformITMScore(double itm_score);
+
+  // Semantic transform parameters (modifiable at runtime for tuning)
+  // Tuned for BLIP2 ITM ~[0, 0.55] instead of theoretical [0, 1]
+  static double low_thresh;       ///< ITM below this → penalty zone (default 0.2)
+  static double high_thresh;      ///< ITM above this → bonus zone (default 0.35)
+  static double penalty_scale;    ///< Max penalty magnitude at ITM=0 (default 3.0)
+  static double bonus_scale;      ///< Max bonus magnitude at ITM=sat_score (default 2.5)
+  static double sat_score;        ///< Saturation ITM for max bonus (default 0.6)
 
   // Accessors for visualization
   const vector<double>& getValueBuffer() const { return value_buffer_; }
@@ -78,6 +101,7 @@ private:
 
   vector<double> value_buffer_;      ///< Per-grid semantic value
   vector<double> confidence_buffer_; ///< Per-grid confidence for weighted fusion
+  std::vector<double> itm_buffer_;  // raw ITM per grid
 
   GridMap::Ptr grid_map_;  ///< Reference to the GridMap
 
@@ -92,7 +116,6 @@ private:
 };
 
 // ============== Inline implementations ==============
-
 inline double ValueMap2D::normalizeAngle(double angle)
 {
   while (angle > M_PI) angle -= 2.0 * M_PI;
@@ -104,6 +127,7 @@ inline int ValueMap2D::toAddress2D(const Vector2i& idx)
 {
   return idx(0) + idx(1) * width_;
 }
+
 
 inline void ValueMap2D::posToIndex2D(const Vector2d& pos, Vector2i& idx)
 {
@@ -147,5 +171,19 @@ inline double ValueMap2D::getValue(const Vector2i& idx)
   if (!isInMap2D(idx)) return 0.0;
   return value_buffer_[toAddress2D(idx)];
 }
+
+inline double ValueMap2D::getITM(const Vector2d& pos){
+  Vector2i idx;
+  posToIndex2D(pos, idx);
+  if (!isInMap2D(idx)) return 0.0;
+  return itm_buffer_[toAddress2D(idx)];
+}
+
+inline void ValueMap2D::ClearBuffer(){
+  value_buffer_.clear();
+  confidence_buffer_.clear();
+  itm_buffer_.clear();
+}
+
 
 #endif

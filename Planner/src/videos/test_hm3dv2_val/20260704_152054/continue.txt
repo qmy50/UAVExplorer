@@ -1,0 +1,16 @@
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00877-4ok3usBNeis/4ok3usBNeis.basis.glb
+Episode ID: 0
++--------------+--------+
+|    Metric    | Total  |
++--------------+--------+
+|   Success    |   1    |
+|     SPL      |  0.81  |
+|   Soft SPL   |  0.80  |
+| Dist to Goal | 0.0462 |
++--------------+--------+
+success or not: success
+target to find is bed
+No.1 task is finished
+46.02 seconds spend in this task
+

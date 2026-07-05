@@ -179,6 +179,7 @@ private:
   nav_msgs::OccupancyGrid cached_2d_map_;          // 缓存的2D OccupancyGrid
   std::vector<int8_t> occupancy_2d_persistent_;     // 持久化2D占据状态，只增不删（建图效果）
   bool has_2d_map_initialized_ = false;             // 是否已完成首次初始化
+  bool use_8neighbor_frontier_ = false;             // false=4邻域frontier(默认), true=8邻域
   double current_z_;
 
   // 缓存的2D地图参数，避免每次查询时访问ROS消息字段
@@ -207,10 +208,51 @@ public:
   bool is2DUnknown(double x, double y);
   bool is2DInflatedOccupiedLine2D(const Eigen::Vector3d& p1, const Eigen::Vector3d& p2);
 
+  // 强制设置2D占据（脱困失败后标记障碍，使DEP规划绕开）
+  void setForceOcc2D(double x, double y);
+
   const nav_msgs::OccupancyGrid& get2DOccupancyGrid() const { return cached_2d_map_; }
   std::vector<Eigen::Vector2i> get2DFreeGrid() const { std::lock_guard<std::mutex> lock(map_2d_mutex_); return free_2d_temp_; }
   const std::vector<int8_t>& get2DOccupancyData() const { return occupancy_2d_persistent_; }
   bool is2DMapReady() const { return has_2d_map_initialized_; }
+
+  // ━━━ 前沿检测 (BFS + PCA 递归分裂) ━━━
+  void setUse8NeighborFrontier(bool use_8n) { use_8neighbor_frontier_ = use_8n; }
+  // 输出格式: vector<(world_center, size_meters)>, 对齐 DEP frontierPointPairs_
+  void detectFrontierClusters(std::vector<std::pair<Eigen::Vector3d, double>>& frontier_pairs,
+                              double z_height,
+                              double cluster_size_xy = 2.0,
+                              int min_cluster_cells = 5,
+                              double min_frontier_size = 0.5,
+                              double min_center_dist = 2.0);
+
+private:
+  // 检查 (gx, gy) 是否为前沿 cell: unknown(-1) 且 4邻域有 free(0)
+  bool isFrontierCell(int gx, int gy) const;
+
+  // 8邻域 BFS 区域生长，收集连通的前沿 cell
+  void bfsGrowFrontier(int seed_gx, int seed_gy,
+                       const std::vector<int8_t>& occupancy,
+                       std::vector<bool>& visited,
+                       std::vector<std::pair<int, int>>& cluster_cells) const;
+
+  // PCA 递归分裂：簇跨度 > cluster_size_xy 时沿第一主成分方向二分
+  void splitClusterPCA(const std::vector<std::pair<int, int>>& cluster_cells,
+                       double cluster_size_xy,
+                       std::vector<std::vector<std::pair<int, int>>>& result) const;
+
+  // 计算簇的世界坐标中心
+  Eigen::Vector3d computeClusterCenter(const std::vector<std::pair<int, int>>& cluster_cells,
+                                       double z_height) const;
+
+  // 计算簇的世界坐标跨度 (max of x_span, y_span)
+  double computeClusterSize(const std::vector<std::pair<int, int>>& cluster_cells) const;
+
+  // grid 坐标 → 世界坐标 (cell center)
+  inline void gridToWorld(int gx, int gy, double& wx, double& wy) const {
+    wx = map_2d_origin_x_ + (gx + 0.5) * (1.0 / map_2d_res_inv_);
+    wy = map_2d_origin_y_ + (gy + 0.5) * (1.0 / map_2d_res_inv_);
+  }
 
 };
 

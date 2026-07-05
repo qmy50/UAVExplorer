@@ -91,6 +91,7 @@ class PathPlannerSim3D{
         void MapCallback(const sensor_msgs::PointCloud2::ConstPtr& pointcloud_map);
         void polyTraj2ROSMsg(traj_utils::PolyTraj &poly_msg);
         bool checkTrajCollision();
+        // bool checkTrajCollisionHabitat(const std::vector<Eigen::Vector3d>& Path);
         VectorXd timeAllocation(const std::vector<Eigen::Vector3d>& Path,
                         double max_vel, double max_acc,
                         double start_vel, double end_vel);
@@ -101,7 +102,7 @@ class PathPlannerSim3D{
         int drone_id_;
 
         inline std::vector<Eigen::Vector3d> getCurrentAstarPath(){
-        return current_a_star_waypoints_;
+            return current_a_star_waypoints_;
         }
 
         inline std::vector<Eigen::Vector3d> getCurrentMincoWayPoints(){

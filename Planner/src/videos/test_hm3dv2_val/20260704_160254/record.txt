@@ -1,0 +1,48 @@
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00877-4ok3usBNeis/4ok3usBNeis.basis.glb
+Episode ID: 3
++--------------+---------+
+|    Metric    | Average |
++--------------+---------+
+| Success Rate |  33.33% |
+|     SPL      |  19.25% |
+|   Soft SPL   |  19.86% |
+| Dist to Goal |  2.4040 |
++--------------+---------+
+success or not: success
+target to find is chair
+No.3 task is finished
+337.03 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00877-4ok3usBNeis/4ok3usBNeis.basis.glb
+Episode ID: 1
++--------------+---------+
+|    Metric    | Average |
++--------------+---------+
+| Success Rate |  0.00%  |
+|     SPL      |  0.00%  |
+|   Soft SPL   |  1.09%  |
+| Dist to Goal |  3.5745 |
++--------------+---------+
+success or not: [stepout] false negative
+target to find is toilet
+No.2 task is finished
+252.70 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00877-4ok3usBNeis/4ok3usBNeis.basis.glb
+Episode ID: 0
++--------------+---------+
+|    Metric    | Average |
++--------------+---------+
+| Success Rate |  0.00%  |
+|     SPL      |  0.00%  |
+|   Soft SPL   |  0.00%  |
+| Dist to Goal |  5.9631 |
++--------------+---------+
+success or not: unknown failure (active stop)
+target to find is bed
+No.1 task is finished
+35.24 seconds spend in this task
+

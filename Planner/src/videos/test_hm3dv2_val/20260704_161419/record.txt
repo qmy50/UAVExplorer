@@ -1,0 +1,64 @@
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 43
++--------------+---------+
+|    Metric    | Average |
++--------------+---------+
+| Success Rate |  75.00% |
+|     SPL      |  40.78% |
+|   Soft SPL   |  42.88% |
+| Dist to Goal |  1.0016 |
++--------------+---------+
+success or not: success
+target to find is bed
+No.4 task is finished
+236.72 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 15
++--------------+---------+
+|    Metric    | Average |
++--------------+---------+
+| Success Rate |  66.67% |
+|     SPL      |  36.54% |
+|   Soft SPL   |  39.48% |
+| Dist to Goal |  1.3241 |
++--------------+---------+
+success or not: success
+target to find is bed
+No.3 task is finished
+183.76 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 30
++--------------+---------+
+|    Metric    | Average |
++--------------+---------+
+| Success Rate |  50.00% |
+|     SPL      |  20.61% |
+|   Soft SPL   |  25.33% |
+| Dist to Goal |  1.9663 |
++--------------+---------+
+success or not: success
+target to find is chair
+No.2 task is finished
+142.43 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 27
++--------------+---------+
+|    Metric    | Average |
++--------------+---------+
+| Success Rate |  0.00%  |
+|     SPL      |  0.00%  |
+|   Soft SPL   |  9.98%  |
+| Dist to Goal |  3.8964 |
++--------------+---------+
+success or not: unknown failure (active stop)
+target to find is bed
+No.1 task is finished
+107.03 seconds spend in this task
+

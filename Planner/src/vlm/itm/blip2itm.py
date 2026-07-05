@@ -32,13 +32,23 @@ class BLIP2ITM:
         name: str = "blip2_image_text_matching",
         model_type: str = "coco",
         device: Optional[Any] = None,
+        use_fp16: bool = True,
     ) -> None:
+        """
+        Args:
+            name: LAVIS model name.
+            model_type: LAVIS model type (e.g. "coco", "pretrain").
+            device: torch device. None → auto-detect CUDA/CPU.
+            use_fp16: Convert model to FP16 on GPU to halve memory usage
+                      (~6.8 GB → ~3.4 GB). Set False to keep FP32 precision.
+        """
         import torch
         from PIL import Image
         from lavis.models import load_model_and_preprocess
 
         self._torch = torch
         self._Image = Image
+        self._use_fp16 = use_fp16
 
         if device is None:
             device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
@@ -52,6 +62,23 @@ class BLIP2ITM:
             )
         )
         self.device = device
+
+        if device.type == "cuda" and use_fp16:
+            # Only convert ViT encoder to FP16 (~2 GB savings).
+            # Q-Former must stay FP32 because Blip2ITM.forward() calls
+            # image_embeds.float() before passing to Q-Former → would
+            # cause Float/Half dtype mismatch in cross-attention linear layers.
+            self.model.visual_encoder = self.model.visual_encoder.half()
+            self.model.ln_vision = self.model.ln_vision.half()
+            self._torch.cuda.empty_cache()
+            alloc = self._torch.cuda.memory_allocated() / (1024 ** 2)
+            total = self._torch.cuda.get_device_properties(0).total_memory / (1024 ** 2)
+            print(f"[BLIP2ITM] FP16-ViT mode: allocated={alloc:.0f}MiB / total={total:.0f}MiB")
+        elif device.type == "cuda":
+            self._torch.cuda.empty_cache()
+            alloc = self._torch.cuda.memory_allocated() / (1024 ** 2)
+            total = self._torch.cuda.get_device_properties(0).total_memory / (1024 ** 2)
+            print(f"[BLIP2ITM] FP32 mode: allocated={alloc:.0f}MiB / total={total:.0f}MiB")
 
     def cosine(self, image: np.ndarray, txt: str) -> float:
         """
@@ -105,9 +132,15 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=12182)
+    parser.add_argument("--fp16", action="store_true", default=False,
+                        help="Use FP16 to reduce GPU memory (default: ON, ~3.4 GB)")
+    parser.add_argument("--fp32", action="store_true", default=True,
+                        help="Use FP32 full precision (overrides --fp16, ~6.8 GB)")
     args = parser.parse_args()
 
-    print("Loading model...")
+    use_fp16 = not args.fp32
+
+    print(f"Loading model (FP16={use_fp16})...")
 
     class BLIP2ITMServer(ServerMixin, BLIP2ITM):
         def process_payload(self, payload: dict) -> dict:
@@ -117,7 +150,7 @@ if __name__ == "__main__":
                 "itm score": self.itm_scores(image, payload["txt"]),
             }
 
-    blip = BLIP2ITMServer()
+    blip = BLIP2ITMServer(use_fp16=use_fp16)
     print("Model loaded!")
     print(f"Hosting on port {args.port}...")
     host_model(blip, name="blip2itm", port=args.port)

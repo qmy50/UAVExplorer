@@ -35,6 +35,53 @@ pcl::search::KdTree<pcl::PointXYZ> kdtreeMap;
 vector<int>     pointIdxSearch;
 vector<float>   pointSquaredDistance;      
 
+// 在 map 边界生成一圈高 1.5m 的围栏，防止 raycast 越界产生无效深度
+void addBoundaryFence(double fence_height)
+{
+   double res = _resolution;
+   double z_start = 0.0;  // 从地面开始
+
+   int nx = ceil((_x_h - _x_l) / res);
+   int ny = ceil((_y_h - _y_l) / res);
+   int nz = ceil(fence_height / res);
+
+   pcl::PointXYZ pt;
+
+   // 左边界 (x = _x_l) 和 右边界 (x = _x_h - res)
+   for (int iy = 0; iy <= ny; ++iy)
+   {
+      double y = _y_l + iy * res;
+      y = floor(y / res) * res + res / 2.0;
+      for (int iz = 0; iz < nz; ++iz)
+      {
+         double z = z_start + iz * res + res / 2.0;
+         // 左墙
+         pt.x = _x_l + res / 2.0;  pt.y = y;  pt.z = z;
+         cloudMap.points.push_back(pt);
+         // 右墙
+         pt.x = _x_h - res / 2.0;  pt.y = y;  pt.z = z;
+         cloudMap.points.push_back(pt);
+      }
+   }
+
+   // 下边界 (y = _y_l) 和 上边界 (y = _y_h - res)
+   for (int ix = 0; ix <= nx; ++ix)
+   {
+      double x = _x_l + ix * res;
+      x = floor(x / res) * res + res / 2.0;
+      for (int iz = 0; iz < nz; ++iz)
+      {
+         double z = z_start + iz * res + res / 2.0;
+         // 下墙
+         pt.x = x;  pt.y = _y_l + res / 2.0;  pt.z = z;
+         cloudMap.points.push_back(pt);
+         // 上墙
+         pt.x = x;  pt.y = _y_h - res / 2.0;  pt.z = z;
+         cloudMap.points.push_back(pt);
+      }
+   }
+}
+
 void RandomMapGenerate()
 {
    random_device rd;
@@ -99,6 +146,9 @@ void RandomMapGenerate()
           kdtreeMap.setInputCloud(cloudMap.makeShared());
       }
    }
+
+   // 边界围栏: 高 1.5m，防 raycast 越界无效深度
+   addBoundaryFence(1.5);
 
    cloudMap.width = cloudMap.points.size();
    cloudMap.height = 1;

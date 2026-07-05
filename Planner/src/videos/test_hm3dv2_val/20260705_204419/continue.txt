@@ -1,0 +1,64 @@
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 19
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    0    |
+|     SPL      |   0.00  |
+|   Soft SPL   |   1.51  |
+| Dist to Goal | 13.0399 |
++--------------+---------+
+success or not: unknown failure (active stop)
+target to find is toilet
+No.4 task is finished
+359.60 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 42
++--------------+---------+
+|    Metric    |  Total  |
++--------------+---------+
+|   Success    |    0    |
+|     SPL      |   0.00  |
+|   Soft SPL   |   1.06  |
+| Dist to Goal | 10.7383 |
++--------------+---------+
+success or not: timeout
+target to find is toilet
+No.3 task is finished
+325.08 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 21
++--------------+--------+
+|    Metric    | Total  |
++--------------+--------+
+|   Success    |   0    |
+|     SPL      |  0.00  |
+|   Soft SPL   |  1.06  |
+| Dist to Goal | 0.8112 |
++--------------+--------+
+success or not: unknown failure (active stop)
+target to find is toilet
+No.2 task is finished
+121.77 seconds spend in this task
+
+
+Scene ID: data/scene_datasets/hm3d_v0.2/val/00853-5cdEh9F2hJL/5cdEh9F2hJL.basis.glb
+Episode ID: 49
++--------------+--------+
+|    Metric    | Total  |
++--------------+--------+
+|   Success    |   0    |
+|     SPL      |  0.00  |
+|   Soft SPL   |  0.46  |
+| Dist to Goal | 0.4039 |
++--------------+--------+
+success or not: unknown failure (active stop)
+target to find is toilet
+No.1 task is finished
+68.17 seconds spend in this task
+

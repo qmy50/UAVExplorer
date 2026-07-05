@@ -25,7 +25,7 @@ import cv2
 import numpy as np
 import requests
 import rospy
-import ros_numpy
+# import ros_numpy
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from std_msgs.msg import Float64
@@ -86,8 +86,13 @@ class YOLOBridge:
 
         # --- Target classes ---
         self.target_classes = rospy.get_param("~target_classes", [])  # e.g. ['bed']
-        img_topic = rospy.get_param(
-            "~img_topic", "/iris_0/realsense/depth_camera/color/image_raw")
+        self.use_habitat = rospy.get_param("/use_habitat_mode",True)
+
+        if self.use_habitat:
+            img_topic = rospy.get_param("~img_topic","/habitat/camera_rgb")
+        else:
+            img_topic = rospy.get_param(
+                "~img_topic", "/iris_0/realsense/depth_camera/color/image_raw")
 
         # --- LLM integration: get confusable labels + fusion threshold ---
         llm_answer_path = rospy.get_param(
@@ -167,7 +172,11 @@ class YOLOBridge:
 
         rospy.loginfo("[YOLOBridge] Ready, processing at %.1f Hz", self.process_rate)
 
-        self.use_visualize = False
+        self.use_visualize = rospy.get_param("~use_visualize", True)
+        if self.use_visualize:
+            self.vis_pub = rospy.Publisher(
+                "/yolo_detector/visualization", Image, queue_size=5)
+            rospy.loginfo("[YOLOBridge] Visualization enabled -> /yolo_detector/visualization")
 
     def _wait_flask(self, timeout=10.0):
         """Wait for Flask server to be ready."""
@@ -217,20 +226,17 @@ class YOLOBridge:
             }
             resp = requests.post(
                 f"{self.flask_url}/detect", json=payload, timeout=3.0)
-            if resp.status_code != 200:
+            H, W = cv_img.shape[:2]
+            detections = []
+            if resp.status_code == 200:
+                detections = resp.json() or []
+            else:
                 rospy.logerr("[YOLOBridge] Flask error: %s", resp.text)
-                return
-
-            detections = resp.json()
-            if not detections:
-                rospy.loginfo_throttle(5.0, "[YOLOBridge] No detections in this frame")
-                return
 
             # Process each detection
             target_hits = 0
             confusable_hits = 0
-            H, W = cv_img.shape[:2]
-
+            # rospy.loginfo("Get server result")
             for det in detections:
                 if det.get("mask") is None:
                     continue
@@ -241,6 +247,7 @@ class YOLOBridge:
                     continue  # not in our detection set
 
                 if label_index == 0:
+                    rospy.loginfo("We got the target class")
                     target_hits += 1
                 else:
                     confusable_hits += 1
@@ -260,12 +267,62 @@ class YOLOBridge:
                 msg.label_name = label_name
                 msg.confidence = det["confidence"]
                 msg.label_index = label_index  # KEY: 0=target, >0=confusable
-
+                rospy.logerr("Send the yolo mask")
                 self.mask_pub.publish(msg)
 
             if target_hits > 0 or confusable_hits > 0:
                 rospy.logwarn("[YOLOBridge] Frame: %d target + %d confusable detections",
                               target_hits, confusable_hits)
+
+            # 可视化：每帧都发布，有检测画框，无检测发原图
+            if self.use_visualize:
+                vis_img = cv_img.copy()
+                for det in detections:
+                    bbox = det.get("bbox")
+                    label = det.get("label_name", "?")
+                    conf = det.get("confidence", 0.0)
+                    label_idx = self._get_label_index(label)
+                    if bbox and len(bbox) >= 4:
+                        if bbox[2] < 1.0 and bbox[3] < 1.0:
+                            x1, y1 = int(bbox[0] * W), int(bbox[1] * H)
+                            x2 = int((bbox[0] + bbox[2]) * W)
+                            y2 = int((bbox[1] + bbox[3]) * H)
+                        else:
+                            x1, y1, x2, y2 = map(int, bbox[:4])
+                        color = (0, 255, 0) if label_idx == 0 else (0, 0, 255)
+                        cv2.rectangle(vis_img, (x1, y1), (x2, y2), color, 2)
+                        cv2.putText(vis_img, f"{label} {conf:.2f}", (x1, y1 - 5),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+                vis_msg = self.bridge.cv2_to_imgmsg(vis_img, "bgr8")
+                vis_msg.header = self.latest_header
+                self.vis_pub.publish(vis_msg)
+
+            # Visualize: draw bounding boxes + labels
+            if self.use_visualize:
+                # vis_img = cv_img.copy()
+                for det in detections:
+                    bbox = det.get("bbox")  # [x1, y1, x2, y2] or [x, y, w, h]
+                    label = det.get("label_name", "?")
+                    conf = det.get("confidence", 0.0)
+                    label_idx = self._get_label_index(label)
+
+                    if bbox and len(bbox) >= 4:
+                        if len(bbox) == 4 and bbox[2] < 1.0 and bbox[3] < 1.0:
+                            # Normalized coords → pixels
+                            x1 = int(bbox[0] * W); y1 = int(bbox[1] * H)
+                            x2 = int((bbox[0] + bbox[2]) * W) if bbox[2] < 1 else int(bbox[2])
+                            y2 = int((bbox[1] + bbox[3]) * H) if bbox[3] < 1 else int(bbox[3])
+                        else:
+                            x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
+                        color = (0, 255, 0) if label_idx == 0 else (0, 0, 255)  # green=target, red=confusable
+                        cv2.rectangle(cv_img, (x1, y1), (x2, y2), color, 2)
+                        cv2.putText(cv_img, f"{label} {conf:.2f}", (x1, y1 - 5),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+                vis_msg = self.bridge.cv2_to_imgmsg(cv_img, "bgr8")
+                vis_msg.header = self.latest_header
+                vis_msg.header.stamp = rospy.Time.now()
+                self.vis_pub.publish(vis_msg)
 
         except requests.exceptions.Timeout:
             rospy.logwarn_throttle(5.0, "[YOLOBridge] Flask timeout")
@@ -279,4 +336,4 @@ if __name__ == "__main__":
     rospy.spin()
 
 
-# rosrun onboard_detector ros_yolo_bridge.py _target_classes:="['bed']"
+# rosrun onboard_detector ros_yolo_bridge.py _target_classes:="['toilet']" 

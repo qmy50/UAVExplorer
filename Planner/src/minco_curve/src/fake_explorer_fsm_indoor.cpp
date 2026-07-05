@@ -81,7 +81,8 @@ void FakeExploreFSM::init(ros::NodeHandle &nh)
     rotation_end_time_ = ros::Time(0);
 
     // ━━━ 初始环顾旋转 ━━━
-    node_.param("fsm/init_rotate", init_rotate_total_steps_, 4);       // 总步数，默认 12 步
+    node_.param("fsm/skip_init_rotate", skip_init_rotate_, true);     // 跳过初始环顾旋转 (默认 true)
+    node_.param("fsm/init_rotate", init_rotate_total_steps_, 4);       // 总步数，默认 4 步
     node_.param("fsm/init_rotate_angle_deg", init_rotate_angle_per_step_, 90.0);  // 每步角度(度)
     init_rotate_angle_per_step_ = init_rotate_angle_per_step_ * M_PI / 180.0;     // 转 rad
     init_rotate_step_ = 0;
@@ -116,7 +117,6 @@ void FakeExploreFSM::init(ros::NodeHandle &nh)
 
     exec_timer_ = node_.createTimer(ros::Duration(0.02), &FakeExploreFSM::execFSMCallback, this);
     dep_timer_ = node_.createTimer(ros::Duration(0.02),&FakeExploreFSM::execDepCallback, this);
-
 }
 
 void FakeExploreFSM::changeLayerCallback(const std_msgs::Bool& msg){
@@ -317,7 +317,8 @@ void FakeExploreFSM::execFSMCallback(const ros::TimerEvent &e)
       if(! maps_ready_) goto force_return;
       // ━━━ 首次启动: 先环顾一周收集语义 value map ━━━
       // 重新进入 INIT 时（后续探索周期）跳过环顾，直接规划
-      if (init_rotate_step_ < init_rotate_total_steps_) {
+      // skip_init_rotate_=true 时直接跳过初始环顾
+      if (!skip_init_rotate_ && init_rotate_step_ < init_rotate_total_steps_) {
         ROS_INFO("[ExploreFSM] Starting initial look-around rotation (%d steps × %.1f°)",
                  init_rotate_total_steps_, init_rotate_angle_per_step_ * 180.0 / M_PI);
         changeFSMExecState(INIT_ROTATE, "INIT -> INIT_ROTATE");
@@ -361,7 +362,8 @@ void FakeExploreFSM::execFSMCallback(const ros::TimerEvent &e)
             rotate_goal_sent_ = false;  // 下一周期重发
           } else {
             // 还在执行中: 最大超时保护
-            constexpr double kMaxTimeout = 8.0;
+            // constexpr double kMaxTimeout = 8.0;
+            constexpr double kMaxTimeout = 20.0;
             double elapsed = (ros::Time::now() - init_rotate_start_time_).toSec();
             if (elapsed > kMaxTimeout) {
               ROS_ERROR("[ExploreFSM] Rotation step %d timeout (%.1fs), cancelling and skipping",
@@ -453,7 +455,6 @@ void FakeExploreFSM::execFSMCallback(const ros::TimerEvent &e)
               // All waypoints in current best_path reached
               touch_goal_ = true;
               trigger_ = false;
-              have_traj_ = false;
               dep_has_new_path_ = false;
               // If this was a cluster/object target, clear the mode and resume exploration
               if (executing_cluster_target_) {
@@ -639,16 +640,16 @@ bool FakeExploreFSM::planToTarget(const std::vector<Eigen::Vector3d> &target_way
 
     bool success = planner_manager_->planGlobalTraj(wps, start_vel, start_acc, target_vel_, target_acc_);
 
-    if (success) {
+    if (success){
         traj_utils::PolyTraj poly_msg;
         traj_utils::MINCOTraj MINCO_msg;
         planner_manager_->polyTraj2ROSMsg(poly_msg, MINCO_msg);
         publishTraj(poly_msg);
         have_traj_ = true;
         // broadcast_ploytraj_pub_.publish(MINCO_msg);
-        // ROS_INFO("[ExploreFSM] planToTarget(vector): smooth trajectory generated with %zu waypoints", wps.size());
+        ROS_INFO("[ExploreFSM] planToTarget(vector): smooth trajectory generated with %zu waypoints", wps.size());
     } else {
-        // ROS_WARN("[ExploreFSM] planToTarget(vector): planGlobalTraj failed");
+        ROS_WARN("[ExploreFSM] planToTarget(vector): planGlobalTraj failed");
     }
     return success;
 }
@@ -793,58 +794,6 @@ void FakeExploreFSM::setWaypointsFromObjectCloud(
   early_replan_requested_ = false;
 
 }
-
-// void FakeExploreFSM::clusterTargetCallback(const geometry_msgs::PoseStampedConstPtr &msg)
-// {
-//   // Ignore new cluster targets if already executing one
-//   if (executing_cluster_target_) {
-//     ROS_WARN("[ExploreFSM] Already executing a cluster target, ignoring new one");
-//     return;
-//   }
-
-//   cluster_target_pt_ = Eigen::Vector3d(msg->pose.position.x,
-//                                         msg->pose.position.y,
-//                                         msg->pose.position.z);
-//   ROS_INFO("[ExploreFSM] Cluster target received at (%.2f, %.2f, %.2f), switching to GOTOCLUSTER",
-//            cluster_target_pt_.x(), cluster_target_pt_.y(), cluster_target_pt_.z());
-
-//   // Publish cluster target as a red sphere Marker in RViz
-//   {
-//     visualization_msgs::Marker marker;
-//     marker.header.frame_id = "map";
-//     marker.header.stamp = ros::Time::now();
-//     marker.ns = "cluster_target";
-//     marker.id = 0;
-//     marker.type = visualization_msgs::Marker::SPHERE;
-//     marker.action = visualization_msgs::Marker::ADD;
-//     marker.pose.position.x = cluster_target_pt_.x();
-//     marker.pose.position.y = cluster_target_pt_.y();
-//     marker.pose.position.z = cluster_target_pt_.z();
-//     marker.pose.orientation.w = 1.0;
-//     marker.scale.x = 0.3;
-//     marker.scale.y = 0.3;
-//     marker.scale.z = 0.3;
-//     marker.color.a = 1.0;
-//     marker.color.r = 1.0;
-//     marker.color.g = 0.0;
-//     marker.color.b = 0.0;
-//     marker.lifetime = ros::Duration(0);  // persistent until new target received
-//     cluster_target_marker_pub_.publish(marker);
-//   }
-
-//   // Set single waypoint and enter cluster mode (DEP exploration fully disabled)
-//   waypoint_list_.clear();
-//   waypoint_list_.push_back(cluster_target_pt_);
-//   current_wp_idx_ = 0;
-//   has_cluster_target_ = true;
-//   executing_cluster_target_ = true;
-//   cluster_path_ready_ = false;
-//   have_traj_ = false;
-//   dep_has_new_path_ = true;   // block DEP from overwriting waypoint_list_
-//   // trigger_ = false;            // don't use DEP exploration trigger
-
-//   changeFSMExecState(GOTOCLUSTER, "Cluster target received");
-// }
 
 void FakeExploreFSM::odometryCallback(const nav_msgs::OdometryConstPtr &msg)
 {
