@@ -1,7 +1,4 @@
 
-
-https://github.com/user-attachments/assets/e25aef3f-002f-4b75-8f6a-35b2f63520f3
-
 # UAV Autonomous Exploration Based on VLN
 
 # 基于视觉语言导航的无人机自主探索框架 
@@ -48,10 +45,55 @@ https://github.com/user-attachments/assets/5037e32e-6300-475b-8d69-bd1ed9e3ea27
 ## 三. 在Gazebo中运行：
 结合XTdrone仿真环境，在gazebo中运行。这里需要完成lavis库的安装以使用blp2，并需要安装yolo
 
-在有torch的虚拟环境中运行
+在有torch的虚拟环境中运行：
+```
+python flask_yolo_server.py --port 5000 --detect-first
+```
+
+开启PX4仿真环境并启动无人机通讯与键盘控制，操作无人机起飞
+```
+roslaunch px4 indoor1.launch
+python multirotor_communication.py iris 0
+python multirotor_keyboard_control.py iris 1 vel
+
+```
+
+开启blip2服务器端
+```
+python blip2itm.py
+```
+开启状态机与yolo，blip2客户端
+```
+roslaunch minco_curve run_in_XTdrone.launch
+rosrun onboard_detector ros_yolo_bridge.py _target_classes:="['bed']"
+python blip2_itm_node.py
+```
 
 ## 四. 在habitat中运行：
+项目测试于habitat-sim  0.2.5与 habitat-lab 0.2.5，可以完成objectnav导航任务
+为完成以下环节，在配置好habitat环境后，需要下载mp3d或hm3d数据集，并安装号groundingdino与mobilesam库，
+具体细节可参考：
 
+运行方式如下：
+开启相应的服务器端,在sr/Planner_src目录级别运行
+```
+python -m vlm.segmentor.sam --port 12183
+python -m vlm.detector.yolo26_detect --port 12184
+python -m vlm.itm.blip2itm --port 12185
+python -m vlm.detector.grounding_dino --port 12181
+```
+
+开启habitat仿真环境
+```
+python habitat_bridge.py
+```
+
+开启状态机与客户端
+```
+roslaunch minco_curve run_in_habitat.launch
+rosrun onboard_detector ros_vlm_bridge.py
+rosrun onboard_detector ros_vlm_bridge.py
+```
 ## 五. Reference：
 [1]. VLN部分价值地图VLM,LLM部分参考ApexNav,链接为: https://github.com/Robotics-STAR-Lab/ApexNav
 
