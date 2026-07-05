@@ -31,14 +31,14 @@ explorer_ws/
 ├── src/
 │   ├── Planner/                    # 核心探索规划包
 │   │   └── src/
-│   │       ├── global_planner/     # DEP 探索规划器 (PRM/RRT/RRT*/KDTree)
-│   │       ├── minco_curve/        # MINCO 轨迹优化 + FSM 状态机 (核心)
+│   │       ├── global_planner/     # DEP 探索规划器 (PRM/KDTree)
+│   │       ├── minco_curve/        # MINCO 轨迹优化 + FSM 状态机 
 │   │       │   ├── launch/explore/ # 仿真探索 launch 文件
 │   │       │   ├── launch/habitat/ # Habitat 模式 launch 文件
 │   │       │   └── src/            # FSM, traj_server, plan_manager, traj_optimizer
 │   │       ├── path_searching/     # 动态 A* 路径搜索
 │   │       ├── plan_env/           # GridMap, ValueMap2D, RayCast, ObjectMap2D
-│   │       ├── traj_utils/         # 轨迹工具库 (PolyTraj, MINCOTraj 消息)
+│   │       ├── traj_utils/         # 轨迹工具库 (PolyTraj, MINCOTraj)
 │   │       ├── onboard_detector/   # YOLO 机载检测 Flask 服务
 │   │       ├── habitat2ros/        # Habitat ↔ ROS 桥接
 │   │       ├── vlm/                # VLM: GroundingDINO, YOLO, MobileSAM, BLIP2
@@ -46,14 +46,6 @@ explorer_ws/
 │   │       ├── basic_utils/        # 失败检测, 记录, 点云工具
 │   │       └── config/             # HM3D/MP3D 数据集配置 YAML
 │   └── uav_simulator/              # 无人机仿真框架
-│       ├── so3_control/            # SO3 几何控制器 (nodelet)
-│       ├── so3_quadrotor_simulator/# 四旋翼动力学仿真
-│       ├── local_sensing/          # 深度相机渲染 (pcl_render_node)
-│       ├── map_generator/          # 随机地图生成 (含边界围栏)
-│       └── Utils/                  # 工具: waypoint_generator, odom_viz, rviz_plugins
-├── build/                          # catkin 构建产物
-├── devel/                          # catkin 开发环境 setup
-└── lockfiles/                      # 运行时锁文件
 ```
 
 ### 项目测试于UBUNTU20.04 ROS1 noetic
