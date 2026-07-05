@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/e25aef3f-002f-4b75-8f6a-35b2f63520f3
+
 # UAV Autonomous Exploration Based on VLN
 
 # 基于视觉语言导航的无人机自主探索框架 
@@ -34,6 +38,12 @@ roslaunch minco_curve rviz_explore.launch
 ```
 roslaunch minco_curve explore.launch
 ```
+运行效果如下：
+
+
+https://github.com/user-attachments/assets/5037e32e-6300-475b-8d69-bd1ed9e3ea27
+
+
 
 ## 三. 在Gazebo中运行：
 结合XTdrone仿真环境，在gazebo中运行。这里需要完成lavis库的安装以使用blp2，并需要安装yolo
