@@ -35,7 +35,14 @@ roslaunch minco_curve rviz_explore.launch
 roslaunch minco_curve explore.launch
 ```
 
-## 三. Reference：
+## 三. 在Gazebo中运行：
+结合XTdrone仿真环境，在gazebo中运行。这里需要完成lavis库的安装以使用blp2，并需要安装yolo
+
+在有torch的虚拟环境中运行
+
+## 四. 在habitat中运行：
+
+## 五. Reference：
 [1]. VLN部分价值地图VLM,LLM部分参考ApexNav,链接为: https://github.com/Robotics-STAR-Lab/ApexNav
 
 [2]. 自主探索框架参考CERLAB-UAV-Autonomy,链接为: https://github.com/Zhefan-Xu/CERLAB-UAV-Autonomy
