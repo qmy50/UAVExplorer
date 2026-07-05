@@ -40,7 +40,6 @@ explorer_ws/
 │   │       ├── plan_env/           # GridMap, ValueMap2D, RayCast, ObjectMap2D
 │   │       ├── traj_utils/         # 轨迹工具库 (PolyTraj, MINCOTraj)
 │   │       ├── onboard_detector/   # YOLO 机载检测 Flask 服务
-│   │       ├── habitat2ros/        # Habitat ↔ ROS 桥接
 │   │       ├── vlm/                # VLM: GroundingDINO, YOLO, MobileSAM, BLIP2
 │   │       ├── llm/                # LLM: DeepSeek 客户端 + prompt 模板
 │   │       ├── basic_utils/        # 失败检测, 记录, 点云工具
