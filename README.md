@@ -125,8 +125,10 @@ rosrun onboard_detector ros_vlm_bridge.py
 
 https://github.com/user-attachments/assets/921d9d12-da3a-46de-9bad-b6d2b8691e30
 
+## 五. ToDo
+1. 为PRM路线图界定加入所属房间标签，从而更好利用房间间空间关联的先验信息
 
-## 五. Reference：
+## 六. Reference：
 [1]. VLN部分价值地图VLM,LLM部分参考ApexNav,链接为: https://github.com/Robotics-STAR-Lab/ApexNav
 
 [2]. 自主探索DEP框架参考CERLAB-UAV-Autonomy,链接为: https://github.com/Zhefan-Xu/CERLAB-UAV-Autonomy
