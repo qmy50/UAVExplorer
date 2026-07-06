@@ -5,26 +5,10 @@
 
 ## 一. 项目流程
 1. 使用dep框架，结合信息增益，语义增益与前沿增益构建prm概率路线如，并选择下一个目标点。
-2. 由fsm负责流程控制。
-3. blip2提供语义匹配分值，yolo+groundingdino负责目标检测，mobileSAM负责语义分割得到目标物体点云信息
+2. blip2提供语义匹配分值，yolo+groundingdino负责目标检测，mobileSAM负责语义分割得到目标物体点云信息
+3. 通过LLM推理在目标检测过程中加入易混淆物体检测，将全部检测结果放入object地图中打分，减小少数帧误检导致的任务失败
+4. 由fsm负责流程控制。
    
-### 项目架构概览如下：
-```
-┌──────────────────────────────────────────────────────────┐
-│  高层: DEP 探索规划器 (global_planner)                     │
-│    PRM 采样 → Dijkstra 路径 → 信息增益 → 最佳探索路径        │
-├──────────────────────────────────────────────────────────┤
-│  中层: MINCO 轨迹优化 + FSM 状态机 (minco_curve)            │
-│    路径点 → 5阶多项式轨迹(LBFGS) → PolyTraj → 100Hz 控制    │
-├──────────────────────────────────────────────────────────┤
-│  底层: SO3 几何控制器 + 四旋翼动力学仿真                     │
-│    PositionCommand → 推力和姿态 → 电机转速 → 物理仿真        │
-├──────────────────────────────────────────────────────────┤
-│  感知: 深度相机仿真 → 光线追踪 → 3D占据栅格 → 2D自由地图      │
-├──────────────────────────────────────────────────────────┤
-│  语义: VLM 检测/分割 + LLM 推理 (Habitat 模式)               │
-└──────────────────────────────────────────────────────────┘
-```
 ### 项目文件功能如下：
 ```
 explorer_ws/
@@ -145,7 +129,7 @@ https://github.com/user-attachments/assets/921d9d12-da3a-46de-9bad-b6d2b8691e30
 ## 五. Reference：
 [1]. VLN部分价值地图VLM,LLM部分参考ApexNav,链接为: https://github.com/Robotics-STAR-Lab/ApexNav
 
-[2]. 自主探索框架参考CERLAB-UAV-Autonomy,链接为: https://github.com/Zhefan-Xu/CERLAB-UAV-Autonomy
+[2]. 自主探索DEP框架参考CERLAB-UAV-Autonomy,链接为: https://github.com/Zhefan-Xu/CERLAB-UAV-Autonomy
 
 [3]. 规划器整体结构及动态环境更新，a*搜索等模块参考/使用 ego planner 链接为：https://github.com/ZJU-FAST-Lab/ego-planner
 
