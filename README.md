@@ -51,7 +51,7 @@ explorer_ws/
 
 ## 二. Quick Start：
 
-在rviz中进行纯数字仿真
+在rviz中进行纯数字仿真，语义值为随机值
 
 克隆项目到本地
 ```
@@ -107,7 +107,7 @@ roslaunch minco_curve run_in_XTdrone.launch
 rosrun onboard_detector ros_yolo_bridge.py _target_classes:="['bed']"
 python blip2_itm_node.py
 ```
-运行效果如下：
+运行效果如下，目标物体为床：
 
 https://github.com/user-attachments/assets/1d1ec0ef-53ac-46dc-aa82-2588001af1cb
 
@@ -137,7 +137,7 @@ roslaunch minco_curve run_in_habitat.launch
 rosrun onboard_detector ros_vlm_bridge.py
 rosrun onboard_detector ros_vlm_bridge.py
 ```
-运行效果如下：
+运行效果如下，目标物体为toilet：
 
 https://github.com/user-attachments/assets/921d9d12-da3a-46de-9bad-b6d2b8691e30
 
