@@ -67,7 +67,7 @@ https://github.com/user-attachments/assets/5037e32e-6300-475b-8d69-bd1ed9e3ea27
 
 
 ## 三. 在Gazebo中运行：
-结合XTdrone仿真环境，在gazebo中运行。这里需要完成lavis库的安装以使用blp2，并需要安装yolo
+结合XTdrone仿真环境使用PX4飞控控制无人机在gazebo中运行。这里需要完成lavis库的安装以使用blp2，并需要安装yolo相关库，并完成XTdrone配置
 
 在有torch的虚拟环境中运行：
 ```
