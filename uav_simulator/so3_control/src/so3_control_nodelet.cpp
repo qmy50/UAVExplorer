@@ -67,8 +67,7 @@ SO3ControlNodelet::publishSO3Command(void)
   const Eigen::Vector3d&    force       = controller_.getComputedForce();
   const Eigen::Quaterniond& orientation = controller_.getComputedOrientation();
 
-  quadrotor_msgs::SO3Command::Ptr so3_command(
-    new quadrotor_msgs::SO3Command); //! @note memory leak?
+  quadrotor_msgs::SO3Command::Ptr so3_command(new quadrotor_msgs::SO3Command); //! @note memory leak?
   so3_command->header.stamp    = ros::Time::now();
   so3_command->header.frame_id = frame_id_;
   so3_command->force.x         = force(0);

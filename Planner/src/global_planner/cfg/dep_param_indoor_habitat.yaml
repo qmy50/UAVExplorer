@@ -33,7 +33,7 @@ yaw_penalty_weight: 4.5
 
 # Semantic Value Map (ValueMap2D)
 use_value_map: true          # Enable/disable semantic value map
-semantic_weight: 350         # Weight for semantic value in path scoring
+semantic_weight: 450         # Weight for semantic value in path scoring
 # candidate_semantic_weight: 0.5
 candidate_semantic_weight: 2.5
 
