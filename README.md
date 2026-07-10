@@ -109,8 +109,7 @@ python -m vlm.detector.yolo26_detect --port 12184
 python -m vlm.itm.blip2itm --port 12185
 python -m vlm.detector.grounding_dino --port 12181
 ```
-
-开启habitat仿真环境
+开启特定仿真场景
 ```
 python habitat_bridge.py
 ```
@@ -118,12 +117,18 @@ python habitat_bridge.py
 开启状态机与客户端
 ```
 roslaunch minco_curve run_in_habitat.launch
-rosrun onboard_detector ros_vlm_bridge.py
-rosrun onboard_detector ros_vlm_bridge.py
+rosrun onboard_detector ros_vlm_bridge.py _target_classes:="[your target class]"
 ```
 运行效果如下，目标物体为toilet：
 
 https://github.com/user-attachments/assets/921d9d12-da3a-46de-9bad-b6d2b8691e30
+
+如果需要运行habitat测试，请执行如下命令
+```
+python habitat_evaluation.py
+roslaunch minco_curve run_in_habitat.launch
+rosrun onboard_detector ros_vlm_bridge.py
+```
 
 ## 五. ToDo
 1. 为PRM路线图节点加入所属房间标签，从而更好利用房间间空间关联的先验信息
