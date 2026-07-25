@@ -8,9 +8,11 @@
 2. blip2提供语义匹配分值，yolo+groundingdino负责目标检测，mobileSAM负责语义分割得到目标物体点云信息
 3. 通过LLM推理在目标检测过程中加入易混淆物体检测，将全部检测结果放入object地图中打分，减小少数帧误检导致的任务失败
 4. 由fsm负责流程控制。
+   
    整体框图如下：
-   <img width="579" height="236" alt="explorer" src="https://github.com/user-attachments/assets/39ba4d99-c68a-412c-849a-71e0f5ea1d2b" />
-
+<div align="center">
+<img width="579" height="236" alt="explorer" src="https://github.com/user-attachments/assets/39ba4d99-c68a-412c-849a-71e0f5ea1d2b" />
+</div>
    
 ### 项目文件功能如下：
 ```
