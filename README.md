@@ -67,9 +67,9 @@ roslaunch minco_curve explore.launch
 ```
 运行效果如下：
 
-
+<div align="center">
 https://github.com/user-attachments/assets/5037e32e-6300-475b-8d69-bd1ed9e3ea27
-
+</div>
 
 
 ## 三. 在Gazebo中运行：
