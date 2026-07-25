@@ -132,7 +132,11 @@ python blip2_itm_node.py
 ```
 运行效果如下，目标物体为toilet：
 <div align="center">
-https://github.com/user-attachments/assets/921d9d12-da3a-46de-9bad-b6d2b8691e30
+   
+
+https://github.com/user-attachments/assets/acd9da62-8161-464c-8186-b99b7f617780
+
+
 </div>
 如果需要运行habitat测试，请执行如下命令
 ```
