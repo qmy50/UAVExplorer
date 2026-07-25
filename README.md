@@ -102,9 +102,9 @@ rosrun onboard_detector ros_yolo_bridge.py _target_classes:="['bed']"
 python blip2_itm_node.py
 ```
 运行效果如下，目标物体为床：
-
+<div align="center">
 https://github.com/user-attachments/assets/1d1ec0ef-53ac-46dc-aa82-2588001af1cb
-
+</div>
 
 ## 四. 在habitat中运行：
 项目测试于habitat-sim  0.2.5与 habitat-lab 0.2.5，可以完成objectnav导航任务
