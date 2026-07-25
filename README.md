@@ -10,10 +10,9 @@
 4. 由fsm负责流程控制。
    
    整体框图如下：
-<div align="center">
+
 <img width="884" height="363" alt="explorer" src="https://github.com/user-attachments/assets/56c2fbd1-5b54-49fe-823d-d6517e128e5d" />
 
-</div>
    
 ### 项目文件功能如下：
 ```
@@ -67,13 +66,9 @@ roslaunch minco_curve explore.launch
 ```
 运行效果如下：
 
-<div align="center">
-
 
 https://github.com/user-attachments/assets/7331be54-9a5c-4620-a4c4-2cb46b21d37f
 
-
-</div>
 
 
 ## 三. 在Gazebo中运行：
