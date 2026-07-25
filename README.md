@@ -68,7 +68,11 @@ roslaunch minco_curve explore.launch
 运行效果如下：
 
 <div align="center">
-https://github.com/user-attachments/assets/5037e32e-6300-475b-8d69-bd1ed9e3ea27
+
+
+https://github.com/user-attachments/assets/7331be54-9a5c-4620-a4c4-2cb46b21d37f
+
+
 </div>
 
 
@@ -127,11 +131,11 @@ rosrun onboard_detector ros_vlm_bridge.py _target_classes:="[your target class]"
 python blip2_itm_node.py
 ```
 运行效果如下，目标物体为toilet：
-
+<div align="center">
 https://github.com/user-attachments/assets/921d9d12-da3a-46de-9bad-b6d2b8691e30
-
+</div>
 如果需要运行habitat测试，请执行如下命令
-```s
+```
 python habitat_evaluation.py
 roslaunch minco_curve run_in_habitat.launch
 rosrun onboard_detector ros_vlm_bridge.py
