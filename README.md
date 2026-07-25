@@ -11,7 +11,7 @@
    
    整体框图如下：
 <div align="center">
-<img width="579" height="236" alt="explorer" src="https://github.com/user-attachments/assets/39ba4d99-c68a-412c-849a-71e0f5ea1d2b" />
+<img width="700" height="300" alt="explorer" src="https://github.com/user-attachments/assets/39ba4d99-c68a-412c-849a-71e0f5ea1d2b" />
 </div>
    
 ### 项目文件功能如下：
