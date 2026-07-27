@@ -138,6 +138,7 @@ https://github.com/user-attachments/assets/acd9da62-8161-464c-8186-b99b7f617780
 
 </div>
 如果需要运行habitat测试，请执行如下命令
+
 ```
 python habitat_evaluation.py
 roslaunch minco_curve run_in_habitat.launch
