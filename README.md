@@ -64,7 +64,7 @@ roslaunch minco_curve rviz_explore.launch
 ```
 roslaunch minco_curve explore.launch
 ```
-运行效果如下：
+这种情况下语义分值为随机值，相当于纯几何探索，运行效果如下：
 
 
 https://github.com/user-attachments/assets/7331be54-9a5c-4620-a4c4-2cb46b21d37f
